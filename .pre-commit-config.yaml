@@ -1,0 +1,65 @@
+# .claude/ and .agents/ ship vendored reference material not held to this
+# project's lint config.
+exclude: ^(\.claude|\.agents)/
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=10000"]
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-ast
+      - id: detect-private-key
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.2
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+        exclude: ^nbks/
+      - id: ruff-format
+        exclude: ^nbks/
+
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.1
+    hooks:
+      - id: nbstripout
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.24.3
+    hooks:
+      - id: gitleaks
+        name: detect secrets (gitleaks)
+
+  - repo: local
+    hooks:
+      - id: eslint-web
+        name: eslint (web)
+        language: system
+        entry: bash -c 'cd web && npm run lint'
+        files: ^web/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false
+
+      - id: no-dotenv-staged
+        name: .env not staged
+        language: fail
+        entry: ".env file must not be committed — use .env.example for templates"
+        files: ^\.env$
+
+      - id: no-plans-staged
+        name: plans/ not staged
+        language: fail
+        entry: ".claude/docs/plans/ files are local-only and must not be committed"
+        files: ^\.claude/docs/plans/
+
+      - id: no-reviews-staged
+        name: reviews/ not staged
+        language: fail
+        entry: ".claude/docs/reviews/ files are local-only and must not be committed"
+        files: ^\.claude/docs/reviews/
