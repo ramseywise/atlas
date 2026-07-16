@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, patch
 
 import polars as pl
 import pytest
 
 from core.preprocessing.crypto.fetcher import CryptoFetcher
-
 
 MOCK_OHLCV = [
     [1704067200000, 42000.0, 42500.0, 41800.0, 42200.0, 1500.0],
@@ -89,7 +88,7 @@ async def test_context_manager(mock_exchange):
 async def test_since_parameter_converted(mock_exchange):
     fetcher = CryptoFetcher(exchange="binance")
     fetcher._exchange = mock_exchange
-    since = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    since = datetime(2024, 1, 1, tzinfo=UTC)
 
     await fetcher.fetch_ohlcv(symbol="BTC/USDT", since=since)
 
