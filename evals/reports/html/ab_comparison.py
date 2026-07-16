@@ -20,16 +20,27 @@ def ab_highlight_cards(va_report) -> str:
         return (
             f'<div class="stat-card">'
             f'<div class="num" style="color:{color}">{value:.0%}</div>'
-            f"<div class=\"label\">{_html.escape(label)}</div>"
+            f'<div class="label">{_html.escape(label)}</div>'
             f'<div class="sub">{_html.escape(sub)}</div></div>'
         )
 
     if comp := h.get("completeness"):
-        cards.append(_card(comp["value"], "VA Completeness", f"Target {comp['threshold']:.0%}", ok=comp["passed"]))
+        cards.append(
+            _card(
+                comp["value"],
+                "VA Completeness",
+                f"Target {comp['threshold']:.0%}",
+                ok=comp["passed"],
+            )
+        )
     if esc := h.get("escalation"):
-        cards.append(_card(esc["value"], "VA Escalation", f"Target {esc['threshold']:.0%}", ok=esc["passed"]))
+        cards.append(
+            _card(esc["value"], "VA Escalation", f"Target {esc['threshold']:.0%}", ok=esc["passed"])
+        )
     if ar := h.get("answer_relevancy"):
-        cards.append(_card(ar["value"], "Answer Relevancy", f"Target {ar['threshold']:.0%}", ok=ar["passed"]))
+        cards.append(
+            _card(ar["value"], "Answer Relevancy", f"Target {ar['threshold']:.0%}", ok=ar["passed"])
+        )
 
     if not cards:
         return ""

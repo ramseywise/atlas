@@ -24,8 +24,8 @@ from core.preprocessing.customer import CustomerProfile
 @dataclass
 class SegmentLabel:
     cluster_id: int
-    label: str          # short name, e.g. "High-Growth SaaS"
-    description: str    # one sentence
+    label: str  # short name, e.g. "High-Growth SaaS"
+    description: str  # one sentence
 
 
 NAMING_SYSTEM_PROMPT = """You are a B2B financial analyst naming customer segments.
@@ -67,8 +67,7 @@ def name_segments(
 
     centroid_json = {
         str(cid): {
-            name: round(float(val), 4)
-            for name, val in zip(feature_names, vec)
+            name: round(float(val), 4) for name, val in zip(feature_names, vec, strict=False)
         }
         for cid, vec in centroids.items()
     }
@@ -98,7 +97,9 @@ def _call_haiku(centroid_json: dict, api_key: str) -> dict | None:
         import anthropic
 
         client = anthropic.Anthropic(api_key=api_key)
-        user_msg = f"Cluster centroids:\n{json.dumps(centroid_json, indent=2)}\n\nName each segment."
+        user_msg = (
+            f"Cluster centroids:\n{json.dumps(centroid_json, indent=2)}\n\nName each segment."
+        )
 
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
@@ -146,38 +147,62 @@ def _rule_based_names(
 
         # Marketplace: extreme gross volume, payout ratio ~90%, weekly cycle
         if total_vol > 60_000 and outflow / max(inflow, 1) > 0.75 and weekly_ac > 0.2:
-            return "Marketplace Platform", "High GMV throughput with rapid seller payouts and event-driven weekly cycles."
+            return (
+                "Marketplace Platform",
+                "High GMV throughput with rapid seller payouts and event-driven weekly cycles.",
+            )
 
         # Pre-revenue startup: inflow_share very low (< 0.25), deep negative net
         if inflow_share < 0.25 and net < -500_000:
-            return "Pre-Revenue Startup", "Equity-funded startup with minimal revenue and high operational burn."
+            return (
+                "Pre-Revenue Startup",
+                "Equity-funded startup with minimal revenue and high operational burn.",
+            )
 
         # Retail seasonal: strong weekly autocorrelation is the fingerprint of
         # weekend-driven consumer spend + high inflow_cv from Q4 spike
         if weekly_ac > 0.35 and inflow_cv > 0.6:
-            return "Retail Seasonal", "Consumer retailer with dominant seasonal revenue spike and thin margins."
+            return (
+                "Retail Seasonal",
+                "Consumer retailer with dominant seasonal revenue spike and thin margins.",
+            )
 
         # Manufacturing: high inflow_cv (lumpy enterprise AR) + high outflow_cv
         # (inventory purchase spikes) + multiple active series
         if inflow_cv > 0.8 and outflow_cv > 0.6 and n_series >= 5:
-            return "Manufacturing", "Capital-intensive manufacturer with lumpy AR collections and inventory-driven costs."
+            return (
+                "Manufacturing",
+                "Capital-intensive manufacturer with lumpy AR collections and inventory-driven costs.",
+            )
 
         # SaaS growth: strong positive trend, good inflow share, low volatility
         if trend > 0.05 and inflow_share > 0.45 and inflow_cv < 0.7:
-            return "SaaS Growth", "Scaling subscription business with rising MRR and sales-driven spend."
+            return (
+                "SaaS Growth",
+                "Scaling subscription business with rising MRR and sales-driven spend.",
+            )
 
         # Professional services: inflow_share moderate-high, low top_share
         # (revenue spread across multiple clients), low outflow_cv
         if inflow_share > 0.45 and top_share < 0.55 and outflow_cv < 0.5:
-            return "Professional Services", "Consulting firm with milestone billing and people-cost dominance."
+            return (
+                "Professional Services",
+                "Consulting firm with milestone billing and people-cost dominance.",
+            )
 
         # SMB services: inflow_share positive, net positive or near-zero, modest scale
         if inflow_share > 0.40 and net >= -100_000:
-            return "SMB Services", "Small services firm with steady project revenue and payroll-heavy costs."
+            return (
+                "SMB Services",
+                "Small services firm with steady project revenue and payroll-heavy costs.",
+            )
 
         # Fallback: net-negative residual
         if net < 0:
-            return "Cash-Constrained", "Net outflow position — operational costs exceed current revenue."
+            return (
+                "Cash-Constrained",
+                "Net outflow position — operational costs exceed current revenue.",
+            )
 
         return "Balanced Operations", "Moderate inflow/outflow mix with stable cash position."
 
@@ -193,7 +218,9 @@ def _rule_based_names(
             # Differentiate by appending the most distinctive scalar
             net = _get(vec, "net_position")
             trend = _get(vec, "trend_slope_norm")
-            qualifier = "High-Burn" if net < -1000 else ("Fast-Growing" if trend > 0.1 else "Stable")
+            qualifier = (
+                "High-Burn" if net < -1000 else ("Fast-Growing" if trend > 0.1 else "Stable")
+            )
             label = f"{qualifier} {label}"
         used_labels.add(label)
         result[str(cid)] = {"label": label, "description": desc}

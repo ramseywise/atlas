@@ -27,7 +27,6 @@ from typing import Literal
 import numpy as np
 import polars as pl
 
-
 # ── Lag and rolling features ──────────────────────────────────────────────────
 
 
@@ -55,9 +54,7 @@ def add_lag_features(
             lagged = np.full(n, float("nan"))
             lagged[lag:] = vals[: n - lag]
             new_cols[f"lag_{lag}d"] = lagged.tolist()
-        frames.append(s.with_columns([
-            pl.Series(k, v) for k, v in new_cols.items()
-        ]))
+        frames.append(s.with_columns([pl.Series(k, v) for k, v in new_cols.items()]))
     return pl.concat(frames).sort([series_col, "date"])
 
 
@@ -102,13 +99,15 @@ def add_ewm_features(
     df: pl.DataFrame,
     value_col: str = "value",
     series_col: str = "series_id",
-    spans: list[int] = [7, 14, 30],
+    spans: list[int] | None = None,
 ) -> pl.DataFrame:
     """
     Exponentially weighted mean for each span.
     EWM is more responsive to recent changes than simple rolling mean —
     useful for catching trend shifts early.
     """
+    if spans is None:
+        spans = [7, 14, 30]
     frames: list[pl.DataFrame] = []
     for sid in df[series_col].unique().sort().to_list():
         s = df.filter(pl.col(series_col) == sid).sort("date")
@@ -152,30 +151,41 @@ def add_calendar_features(
     Fourier terms allow the model to capture smooth seasonality without
     dummy-variable explosion. Use k=1..3 harmonics per period.
     """
-    df = df.with_columns([
-        pl.col(date_col).dt.weekday().alias("day_of_week"),
-        pl.col(date_col).dt.day().alias("day_of_month"),
-        pl.col(date_col).dt.month().alias("month"),
-        pl.col(date_col).dt.quarter().alias("quarter"),
-        (pl.col(date_col).dt.month_end() == pl.col(date_col)).cast(pl.Int8).alias("is_month_end"),
-        pl.col(date_col).dt.ordinal_day().alias("day_of_year"),
-    ])
-
-    df = df.with_columns([
-        (
-            (pl.col(date_col).dt.month().is_in([3, 6, 9, 12])) &
+    df = df.with_columns(
+        [
+            pl.col(date_col).dt.weekday().alias("day_of_week"),
+            pl.col(date_col).dt.day().alias("day_of_month"),
+            pl.col(date_col).dt.month().alias("month"),
+            pl.col(date_col).dt.quarter().alias("quarter"),
             (pl.col(date_col).dt.month_end() == pl.col(date_col))
-        ).cast(pl.Int8).alias("is_quarter_end"),
-        (
-            (pl.col(date_col).dt.month() == 12) &
-            (pl.col(date_col).dt.day() == 31)
-        ).cast(pl.Int8).alias("is_year_end"),
-    ])
+            .cast(pl.Int8)
+            .alias("is_month_end"),
+            pl.col(date_col).dt.ordinal_day().alias("day_of_year"),
+        ]
+    )
+
+    df = df.with_columns(
+        [
+            (
+                (pl.col(date_col).dt.month().is_in([3, 6, 9, 12]))
+                & (pl.col(date_col).dt.month_end() == pl.col(date_col))
+            )
+            .cast(pl.Int8)
+            .alias("is_quarter_end"),
+            ((pl.col(date_col).dt.month() == 12) & (pl.col(date_col).dt.day() == 31))
+            .cast(pl.Int8)
+            .alias("is_year_end"),
+        ]
+    )
 
     # Days to month end — proxy for AR/AP pressure
-    df = df.with_columns([
-        (pl.col(date_col).dt.month_end().dt.day() - pl.col(date_col).dt.day()).alias("days_to_month_end")
-    ])
+    df = df.with_columns(
+        [
+            (pl.col(date_col).dt.month_end().dt.day() - pl.col(date_col).dt.day()).alias(
+                "days_to_month_end"
+            )
+        ]
+    )
 
     if include_fourier:
         dow = df["day_of_week"].to_numpy().astype(float)
@@ -191,9 +201,7 @@ def add_calendar_features(
             fourier_cols[f"annual_sin_{k}"] = np.sin(2 * np.pi * k * doy / 365.25)
             fourier_cols[f"annual_cos_{k}"] = np.cos(2 * np.pi * k * doy / 365.25)
 
-        df = df.with_columns([
-            pl.Series(k, v.tolist()) for k, v in fourier_cols.items()
-        ])
+        df = df.with_columns([pl.Series(k, v.tolist()) for k, v in fourier_cols.items()])
 
     return df
 
@@ -222,19 +230,20 @@ def add_company_level_features(
     from core.preprocessing.ingestion import CashFlowSign
 
     daily = (
-        df
-        .with_columns(
+        df.with_columns(
             pl.when(pl.col(sign_col) == CashFlowSign.INFLOW.value)
-              .then(pl.col(amount_col))
-              .otherwise(-pl.col(amount_col))
-              .alias("_signed")
+            .then(pl.col(amount_col))
+            .otherwise(-pl.col(amount_col))
+            .alias("_signed")
         )
         .group_by([customer_id_col, date_col])
-        .agg([
-            pl.col("_signed").sum().alias("net_cashflow"),
-            pl.col("_signed").filter(pl.col("_signed") > 0).sum().alias("_total_in"),
-            pl.col("_signed").filter(pl.col("_signed") < 0).abs().sum().alias("_total_out"),
-        ])
+        .agg(
+            [
+                pl.col("_signed").sum().alias("net_cashflow"),
+                pl.col("_signed").filter(pl.col("_signed") > 0).sum().alias("_total_in"),
+                pl.col("_signed").filter(pl.col("_signed") < 0).abs().sum().alias("_total_out"),
+            ]
+        )
         .with_columns(
             (pl.col("_total_in") / (pl.col("_total_out") + 1.0)).alias("inflow_outflow_ratio")
         )
@@ -257,10 +266,14 @@ def add_company_level_features(
             roll_net[i] / roll_std[i] if not np.isnan(roll_net[i]) else float("nan")
             for i in range(n)
         ]
-        company_frames.append(c.with_columns([
-            pl.Series("rolling_net_30d", roll_net),
-            pl.Series("cash_runway_signal", runway),
-        ]))
+        company_frames.append(
+            c.with_columns(
+                [
+                    pl.Series("rolling_net_30d", roll_net),
+                    pl.Series("cash_runway_signal", runway),
+                ]
+            )
+        )
 
     company_df = pl.concat(company_frames).drop(["_total_in", "_total_out"])
     return df.join(company_df, on=[customer_id_col, date_col], how="left")
@@ -272,14 +285,14 @@ def add_company_level_features(
 @dataclass
 class FeatureImportanceResult:
     method: str
-    importances: dict[str, float]   # feature_name → score
+    importances: dict[str, float]  # feature_name → score
     ranked: list[tuple[str, float]]  # sorted desc by score
 
     def top_k(self, k: int = 15) -> list[tuple[str, float]]:
         return self.ranked[:k]
 
     def as_dataframe(self) -> pl.DataFrame:
-        names, scores = zip(*self.ranked) if self.ranked else ([], [])
+        names, scores = zip(*self.ranked, strict=False) if self.ranked else ([], [])
         return pl.DataFrame({"feature": list(names), "importance": list(scores)})
 
 
@@ -300,7 +313,7 @@ def mutual_information_importance(
         from sklearn.feature_selection import mutual_info_regression
 
         scores = mutual_info_regression(X, y, discrete_features=discrete_features, random_state=42)
-        importance = dict(zip(feature_names, scores.tolist()))
+        importance = dict(zip(feature_names, scores.tolist(), strict=False))
         ranked = sorted(importance.items(), key=lambda x: x[1], reverse=True)
         return FeatureImportanceResult("mutual_information", importance, ranked)
     except ImportError:
@@ -334,6 +347,7 @@ def correlation_importance(
             c = float(np.corrcoef(col[valid], y[valid])[0, 1])
         else:
             from scipy.stats import spearmanr
+
             c, _ = spearmanr(col[valid], y[valid])
         scores[name] = abs(float(c)) if not np.isnan(c) else 0.0
 
@@ -415,8 +429,15 @@ def feature_names_for_ml(df: pl.DataFrame, exclude: list[str] | None = None) -> 
     Excludes known non-feature columns and any specified extras.
     """
     non_features = {
-        "date", "series_id", "customer_id", "source", "sign",
-        "is_anomaly", "currency", "amount", "value",
+        "date",
+        "series_id",
+        "customer_id",
+        "source",
+        "sign",
+        "is_anomaly",
+        "currency",
+        "amount",
+        "value",
         # target columns
         *[f"target_{k}d" for k in range(1, 91)],
     }

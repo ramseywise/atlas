@@ -6,7 +6,7 @@ Each grader is:
   - Stateless (no side effects), except DriftGrader which maintains a rolling window
   - Composable via EvalHarness
 
-Graders follow the galactus eval pattern: one module, harness orchestrates.
+Graders follow the legacy eval pattern: one module, harness orchestrates.
 
 Pass thresholds imported from evals/metrics/constants.py — change thresholds there,
 not here, so graders stay decoupled from tier policy.
@@ -20,15 +20,14 @@ from datetime import date
 
 import numpy as np
 
-from src.agents.state import EvalReport, ForecastResult, GraderScore
 from evals.metrics.constants import (
+    DEFAULT_COVERAGE_THRESHOLD,
+    DEFAULT_DIRECTIONAL_THRESHOLD,
+    DEFAULT_DRIFT_THRESHOLD,
     DEFAULT_MASE_THRESHOLD,
     DEFAULT_SMAPE_THRESHOLD,
-    DEFAULT_DIRECTIONAL_THRESHOLD,
-    DEFAULT_COVERAGE_THRESHOLD,
-    DEFAULT_DRIFT_THRESHOLD,
 )
-
+from src.agents.state import EvalReport, ForecastResult, GraderScore
 
 # ── Base ──────────────────────────────────────────────────────────────────────
 
@@ -38,8 +37,7 @@ class BaseGrader(ABC):
     threshold: float
 
     @abstractmethod
-    def score(self, actuals: np.ndarray, forecast: ForecastResult) -> GraderScore:
-        ...
+    def score(self, actuals: np.ndarray, forecast: ForecastResult) -> GraderScore: ...
 
     def _make_score(self, value: float, detail: str = "") -> GraderScore:
         return GraderScore(
@@ -92,8 +90,11 @@ class SMAPEGrader(BaseGrader):
 
     def score(self, actuals: np.ndarray, forecast: ForecastResult) -> GraderScore:
         preds = np.array(forecast.point_forecast[: len(actuals)])
-        denom = np.where((np.abs(actuals) + np.abs(preds)) / 2 < 1e-8, 1e-8,
-                         (np.abs(actuals) + np.abs(preds)) / 2)
+        denom = np.where(
+            (np.abs(actuals) + np.abs(preds)) / 2 < 1e-8,
+            1e-8,
+            (np.abs(actuals) + np.abs(preds)) / 2,
+        )
         smape = 100.0 * np.mean(np.abs(actuals - preds) / denom)
         return self._make_score(smape, f"SMAPE={smape:.2f}%")
 
@@ -163,8 +164,10 @@ class DriftGrader(BaseGrader):
     def score(self) -> GraderScore:
         if not self._mase_history:
             return GraderScore(
-                grader_name=self.name, metric_value=1.0,
-                threshold=self.threshold, passed=True,
+                grader_name=self.name,
+                metric_value=1.0,
+                threshold=self.threshold,
+                passed=True,
                 detail="No history — drift check skipped",
             )
         rolling_mase = float(np.mean(self._mase_history))
@@ -190,9 +193,7 @@ class EvalHarness:
         baseline_mase: float = 0.85,
     ):
         self._drift_grader = DriftGrader(baseline_mase=baseline_mase)
-        self._mase_graders = {
-            sid: MASEGrader(arr) for sid, arr in train_data_by_series.items()
-        }
+        self._mase_graders = {sid: MASEGrader(arr) for sid, arr in train_data_by_series.items()}
         self._smape_g = SMAPEGrader()
         self._dir_g = DirectionalGrader()
         self._cov_g = CoverageGrader()
@@ -267,6 +268,5 @@ class EvalHarness:
 def _summarise(mase, smape, dir_acc, cov, drift_score) -> str:
     drift_flag = " ⚠ DRIFT" if not drift_score.passed else ""
     return (
-        f"MASE={mase:.3f} | SMAPE={smape:.1f}% | "
-        f"Dir={dir_acc:.1f}% | Cov80={cov:.1f}%{drift_flag}"
+        f"MASE={mase:.3f} | SMAPE={smape:.1f}% | Dir={dir_acc:.1f}% | Cov80={cov:.1f}%{drift_flag}"
     )

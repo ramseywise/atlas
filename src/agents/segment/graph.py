@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-import polars as pl
 from langgraph.graph import END, START, StateGraph
 
 from src.agents.segment.nodes import (
@@ -22,8 +21,7 @@ from src.agents.segment.nodes import (
     labeler_node,
     profiler_node,
 )
-from src.agents.segment.state import SegmentResult, SegmentationState, SegmentationStrategy
-
+from src.agents.segment.state import SegmentationState, SegmentationStrategy, SegmentResult
 
 # ── Routing ───────────────────────────────────────────────────────────────────
 
@@ -130,16 +128,19 @@ def run_segmentation_agent(
 def _print_summary(state: dict[str, Any]) -> None:
     try:
         from rich.console import Console
-        from rich.table import Table
 
         console = Console()
         result: SegmentResult | None = state.get("result")
         report = state.get("eval_report")
 
-        console.print(f"\n[bold green]✓ Segmentation agent completed — {state.get('cycle', 0)} cycle(s)[/bold green]")
+        console.print(
+            f"\n[bold green]✓ Segmentation agent completed — {state.get('cycle', 0)} cycle(s)[/bold green]"
+        )
 
         if result:
-            console.print(f"  Segments: {result['n_segments']} | Customers: {len(result['customer_ids'])}")
+            console.print(
+                f"  Segments: {result['n_segments']} | Customers: {len(result['customer_ids'])}"
+            )
             for cid, info in result["segment_names"].items():
                 console.print(f"    [{cid}] {info['label']} — {info['description']}")
 
@@ -152,4 +153,6 @@ def _print_summary(state: dict[str, Any]) -> None:
     except ImportError:
         result = state.get("result")
         if result:
-            print(f"\nSegmentation done: {result['n_segments']} segments, {len(result['customer_ids'])} customers")
+            print(
+                f"\nSegmentation done: {result['n_segments']} segments, {len(result['customer_ids'])} customers"
+            )

@@ -28,7 +28,7 @@ def collect_qa_samples(
 ) -> dict[str, list[dict]]:
     """Sample n QA pairs per sentiment (liked/disliked), diverse across failure types."""
     buckets: dict[str, list] = {"liked": [], "disliked": [], "unrated": []}
-    for task, s in zip(tasks, sentiments):
+    for task, s in zip(tasks, sentiments, strict=False):
         meta = task.metadata or {}
         raw_ft = meta.get("failure_type")
         if raw_ft and raw_ft != "none":
@@ -43,13 +43,15 @@ def collect_qa_samples(
         r = task.response.strip() if isinstance(task.response, str) else ""
         if not q or not r:
             continue
-        buckets[s].append({
-            "query": q,
-            "response": r,
-            "sentiment": s,
-            "ft": ft,
-            "urls": task.expected_urls or [],
-        })
+        buckets[s].append(
+            {
+                "query": q,
+                "response": r,
+                "sentiment": s,
+                "ft": ft,
+                "urls": task.expected_urls or [],
+            }
+        )
 
     def _diverse_sample(records: list[dict], n: int) -> list[dict]:
         seen_fts: set = set()
@@ -169,7 +171,6 @@ _DETAIL_CSS = """
 """
 
 
-
 def export_stats_html(
     all_stats: dict,
     paths: list[Path],
@@ -231,6 +232,7 @@ def export_stats_html(
     out.write_text(html, encoding="utf-8")
     if pdf:
         from evals.reports.utils._pdf import html_to_pdf
+
         pdf_path = html_to_pdf(out)
         print(f"PDF: {pdf_path}")
     return out

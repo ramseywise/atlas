@@ -7,9 +7,11 @@ Usage:
     uv run python -m evals.reports compare
     uv run python -m evals.reports compare --output evals/reports/sa/comparison.html
 """
+
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import re
 from datetime import UTC, datetime
@@ -17,6 +19,7 @@ from pathlib import Path
 
 try:
     import numpy as np
+
     _HAS_NUMPY = True
 except ImportError:
     _HAS_NUMPY = False
@@ -25,42 +28,64 @@ except ImportError:
 # Paths
 # ---------------------------------------------------------------------------
 
-ABLATION_DIR   = Path("data/datasets/support-agents/ablation")
-QUALITY_DIR    = Path("data/datasets/support-agents/quality")
-VA_STAGING_SMOKE = Path(
-    "data/datasets/support-agents/va_staging/evals/smoke_20260509_212709.json"
-)
+ABLATION_DIR = Path("data/datasets/support-agents/ablation")
+QUALITY_DIR = Path("data/datasets/support-agents/quality")
+VA_STAGING_SMOKE = Path("data/datasets/support-agents/va_staging/evals/smoke_20260509_212709.json")
 BKH_QUALITY = Path("data/datasets/bkh/quality_results/graded_train.json")
 # va_staging quality: latest graded run from va-agents (single production service)
-VA_STAGING_QUALITY = Path(
-    "data/datasets/va_staging/runs/20260508_170125/responses_graded.json"
-)
+VA_STAGING_QUALITY = Path("data/datasets/va_staging/runs/20260508_170125/responses_graded.json")
 CORPUS_PATH = Path("data/articles/corpus_articles.jsonl")
 DEFAULT_OUT = Path("evals/reports/sa/comparison.html")
 
+# KB articles exist on two domains: the live help-center domain (cited by the
+# agent) and the legacy KB domain (used by golden expected_urls).
+LIVE_KB_DOMAIN = "help.kb-live.example"
+LEGACY_KB_URL_RE = r"kb-legacy\.example/support/article/([^/\s\"'<>?#]+)"
+
 # Display labels and ordering for each config file
 _CONFIG_LABELS: dict[str, tuple[str, str]] = {
-    "va_staging":              ("va_staging",              "gemini-3-flash-preview + ThinkingLevel.LOW + Bedrock HYBRID"),
-    "adk_flash_thinking1024":  ("hc_adk flash+thinking",   "gemini-3-flash-preview, thinking=1024 (≈va_staging config)"),
-    "adk_flash":               ("hc_adk flash",             "gemini-3-flash-preview, thinking=0, Bedrock HYBRID"),
-    "lg_flash":                ("hc_lg flash",              "gemini-3-flash-preview, CRAG=true, Bedrock HYBRID"),
-    "lg_multi_query":          ("hc_lg multi-query",        "gemini-2.5-flash, MULTI_QUERY=true, CRAG=true"),
-    "adk_rag_backend":         ("hc_adk + hc_rag",          "gemini-2.5-flash, hc_rag local retrieval backend"),
-    "lg_rag_backend":          ("hc_lg + hc_rag",           "gemini-2.5-flash, CRAG=true, hc_rag local retrieval backend"),
-    "adk_thinking1024":        ("hc_adk + thinking",        "gemini-2.5-flash, thinking=1024, Bedrock HYBRID"),
-    "lg_crag":                 ("hc_lg + CRAG",             "gemini-2.5-flash, CRAG=true, Bedrock HYBRID"),
-    "lg_no_crag":              ("hc_lg no CRAG",            "gemini-2.5-flash, CRAG=false, Bedrock HYBRID"),
-    "lg_crag_thinking1024":    ("hc_lg + CRAG + think",    "gemini-2.5-flash, CRAG=true, thinking=1024"),
-    "lg_llm_planner":          ("hc_lg + LLM planner",     "gemini-2.5-flash, CRAG=true, LLM_PLANNER=true"),
-    "adk_baseline":            ("hc_adk baseline",          "gemini-2.5-flash, thinking=0, Bedrock HYBRID"),
+    "va_staging": ("va_staging", "gemini-3-flash-preview + ThinkingLevel.LOW + Bedrock HYBRID"),
+    "adk_flash_thinking1024": (
+        "hc_adk flash+thinking",
+        "gemini-3-flash-preview, thinking=1024 (≈va_staging config)",
+    ),
+    "adk_flash": ("hc_adk flash", "gemini-3-flash-preview, thinking=0, Bedrock HYBRID"),
+    "lg_flash": ("hc_lg flash", "gemini-3-flash-preview, CRAG=true, Bedrock HYBRID"),
+    "lg_multi_query": ("hc_lg multi-query", "gemini-2.5-flash, MULTI_QUERY=true, CRAG=true"),
+    "adk_rag_backend": ("hc_adk + hc_rag", "gemini-2.5-flash, hc_rag local retrieval backend"),
+    "lg_rag_backend": (
+        "hc_lg + hc_rag",
+        "gemini-2.5-flash, CRAG=true, hc_rag local retrieval backend",
+    ),
+    "adk_thinking1024": ("hc_adk + thinking", "gemini-2.5-flash, thinking=1024, Bedrock HYBRID"),
+    "lg_crag": ("hc_lg + CRAG", "gemini-2.5-flash, CRAG=true, Bedrock HYBRID"),
+    "lg_no_crag": ("hc_lg no CRAG", "gemini-2.5-flash, CRAG=false, Bedrock HYBRID"),
+    "lg_crag_thinking1024": ("hc_lg + CRAG + think", "gemini-2.5-flash, CRAG=true, thinking=1024"),
+    "lg_llm_planner": ("hc_lg + LLM planner", "gemini-2.5-flash, CRAG=true, LLM_PLANNER=true"),
+    "adk_baseline": ("hc_adk baseline", "gemini-2.5-flash, thinking=0, Bedrock HYBRID"),
     # ── YAML-config ablation runs (Sprint 3+) ────────────────────────────────
-    "hc_adk_flash":            ("hc_adk flash (v2)",         "gemini-3-flash-preview, thinking=0, Bedrock HYBRID"),
-    "hc_lg_crag_only":         ("hc_lg CRAG baseline (v2)", "gemini-2.5-flash, CRAG=true, all other flags off"),
-    "hc_lg_multiquery":        ("hc_lg multi-query (v2)",   "gemini-2.5-flash, CRAG=true, MULTI_QUERY=true"),
-    "hc_lg_hyde":              ("hc_lg HyDE (v2)",           "gemini-2.5-flash, CRAG=true, HyDE pre-retrieval (+200-400ms)"),
-    "hc_lg_hitl":              ("hc_lg HITL gate (v2)",      "gemini-2.5-flash, CRAG=true, confidence escalation gate threshold=0.3"),
-    "hc_lg_post_eval":         ("hc_lg post-answer (v2)",   "gemini-2.5-flash, CRAG=true, post-answer LLM judge (refine loop)"),
-    "hc_rag_full":             ("hc_rag full pipeline",      "planner→retriever→qa_policy→HITL×2→answer→post_answer_eval→summarizer"),
+    "hc_adk_flash": ("hc_adk flash (v2)", "gemini-3-flash-preview, thinking=0, Bedrock HYBRID"),
+    "hc_lg_crag_only": (
+        "hc_lg CRAG baseline (v2)",
+        "gemini-2.5-flash, CRAG=true, all other flags off",
+    ),
+    "hc_lg_multiquery": ("hc_lg multi-query (v2)", "gemini-2.5-flash, CRAG=true, MULTI_QUERY=true"),
+    "hc_lg_hyde": (
+        "hc_lg HyDE (v2)",
+        "gemini-2.5-flash, CRAG=true, HyDE pre-retrieval (+200-400ms)",
+    ),
+    "hc_lg_hitl": (
+        "hc_lg HITL gate (v2)",
+        "gemini-2.5-flash, CRAG=true, confidence escalation gate threshold=0.3",
+    ),
+    "hc_lg_post_eval": (
+        "hc_lg post-answer (v2)",
+        "gemini-2.5-flash, CRAG=true, post-answer LLM judge (refine loop)",
+    ),
+    "hc_rag_full": (
+        "hc_rag full pipeline",
+        "planner→retriever→qa_policy→HITL×2→answer→post_answer_eval→summarizer",
+    ),
 }
 
 # Estimated cost per 1K queries (USD). Based on Gemini public pricing:
@@ -71,32 +96,33 @@ _CONFIG_LABELS: dict[str, tuple[str, str]] = {
 # Bedrock costs ($0.003/query KB lookup) are excluded — same across all configs.
 _CONFIG_COST: dict[str, tuple[str, str]] = {
     # (cost_per_1k_queries_usd_string, tooltip)
-    "va_staging":             ("~$0.45", "flash-preview + ThinkingLevel.LOW (~300 thinking tok/q)"),
+    "va_staging": ("~$0.45", "flash-preview + ThinkingLevel.LOW (~300 thinking tok/q)"),
     "adk_flash_thinking1024": ("~$0.45", "flash-preview + 1024 thinking tokens/query"),
-    "adk_flash":              ("~$0.12", "flash-preview, no thinking, 1 LLM call/query"),
-    "lg_flash":               ("~$0.20", "flash-preview + CRAG grader call (~+40%)"),
-    "lg_multi_query":         ("~$0.28", "2.5-flash + CRAG + multi-query expansion"),
-    "adk_rag_backend":        ("~$0.18", "2.5-flash, 1 LLM call/query, local RAG"),
-    "lg_rag_backend":         ("~$0.30", "2.5-flash + CRAG grader call, local RAG"),
-    "adk_thinking1024":       ("~$0.62", "2.5-flash + 1024 thinking tokens/query"),
-    "lg_crag":                ("~$0.30", "2.5-flash + CRAG grader call"),
-    "lg_no_crag":             ("~$0.18", "2.5-flash, 1 LLM call/query, no CRAG"),
-    "lg_crag_thinking1024":   ("~$0.92", "2.5-flash + CRAG + 1024 thinking tokens"),
-    "lg_llm_planner":         ("~$0.35", "2.5-flash + CRAG + LLM planner call"),
-    "adk_baseline":           ("~$0.18", "2.5-flash, 1 LLM call/query, no thinking"),
+    "adk_flash": ("~$0.12", "flash-preview, no thinking, 1 LLM call/query"),
+    "lg_flash": ("~$0.20", "flash-preview + CRAG grader call (~+40%)"),
+    "lg_multi_query": ("~$0.28", "2.5-flash + CRAG + multi-query expansion"),
+    "adk_rag_backend": ("~$0.18", "2.5-flash, 1 LLM call/query, local RAG"),
+    "lg_rag_backend": ("~$0.30", "2.5-flash + CRAG grader call, local RAG"),
+    "adk_thinking1024": ("~$0.62", "2.5-flash + 1024 thinking tokens/query"),
+    "lg_crag": ("~$0.30", "2.5-flash + CRAG grader call"),
+    "lg_no_crag": ("~$0.18", "2.5-flash, 1 LLM call/query, no CRAG"),
+    "lg_crag_thinking1024": ("~$0.92", "2.5-flash + CRAG + 1024 thinking tokens"),
+    "lg_llm_planner": ("~$0.35", "2.5-flash + CRAG + LLM planner call"),
+    "adk_baseline": ("~$0.18", "2.5-flash, 1 LLM call/query, no thinking"),
     # ── YAML-config ablation runs (Sprint 3+) ────────────────────────────────
-    "hc_adk_flash":           ("~$0.12", "flash-preview, no thinking, 1 LLM call/query"),
-    "hc_lg_crag_only":        ("~$0.30", "2.5-flash + CRAG grader call"),
-    "hc_lg_multiquery":       ("~$0.28", "2.5-flash + CRAG + multi-query expansion"),
-    "hc_lg_hyde":             ("~$0.32", "2.5-flash + CRAG + HyDE extra Gemini pre-call"),
-    "hc_lg_hitl":             ("~$0.30", "2.5-flash + CRAG + confidence escalation gate"),
-    "hc_lg_post_eval":        ("~$0.42", "2.5-flash + CRAG + post-answer LLM judge"),
-    "hc_rag_full":            ("~$0.55", "full pipeline: HITL, post-answer eval, summarizer"),
+    "hc_adk_flash": ("~$0.12", "flash-preview, no thinking, 1 LLM call/query"),
+    "hc_lg_crag_only": ("~$0.30", "2.5-flash + CRAG grader call"),
+    "hc_lg_multiquery": ("~$0.28", "2.5-flash + CRAG + multi-query expansion"),
+    "hc_lg_hyde": ("~$0.32", "2.5-flash + CRAG + HyDE extra Gemini pre-call"),
+    "hc_lg_hitl": ("~$0.30", "2.5-flash + CRAG + confidence escalation gate"),
+    "hc_lg_post_eval": ("~$0.42", "2.5-flash + CRAG + post-answer LLM judge"),
+    "hc_rag_full": ("~$0.55", "full pipeline: HITL, post-answer eval, summarizer"),
 }
 
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
+
 
 def _normalize_task_id(tid: str) -> str:
     """8a6d6d8c_3fa6_48bd_9e4b_44f17b447b3a_t1 → 8a6d6d8c-3fa6-48bd-9e4b-44f17b447b3a_turn_1"""
@@ -142,15 +168,15 @@ def _build_slug_map() -> dict[str, str]:
             continue
         a = json.loads(line)
         url = a.get("url", "")
-        if "help.shine.co" in url:
+        if LIVE_KB_DOMAIN in url:
             m = re.search(r"/articles/\d+-(.+)$", url)
             if m:
                 slug_map[m.group(1).rstrip("/")] = url
     return slug_map
 
 
-def _resolve_billy_url(billy_url_str: str, slug_map: dict[str, str]) -> str | None:
-    m = re.search(r"billy\.dk/support/article/([^/\s\"'<>?#]+)", billy_url_str)
+def _resolve_legacy_url(legacy_url_str: str, slug_map: dict[str, str]) -> str | None:
+    m = re.search(LEGACY_KB_URL_RE, legacy_url_str)
     if not m:
         return None
     slug = m.group(1).rstrip("/").split("?")[0]
@@ -191,9 +217,9 @@ def compute_bkh_retrieval_stats(bkh: dict, configs: dict) -> dict:
 
     # Score BKH on the tasks where it overlaps with annotated ablation tasks
     overlap_mrr: dict[str, float] = {}
-    overlap_p1:  dict[str, float] = {}
-    overlap_p3:  dict[str, float] = {}
-    overlap_r3:  dict[str, float] = {}
+    overlap_p1: dict[str, float] = {}
+    overlap_p3: dict[str, float] = {}
+    overlap_r3: dict[str, float] = {}
     n_overlap = 0
 
     for bkh_id, entry in bkh.items():
@@ -206,14 +232,14 @@ def compute_bkh_retrieval_stats(bkh: dict, configs: dict) -> dict:
         expected_urls = entry.get("expected_urls", [])
         if not expected_urls:
             overlap_mrr[ablation_id] = 0.0
-            overlap_p1[ablation_id]  = 0.0
-            overlap_p3[ablation_id]  = 0.0
-            overlap_r3[ablation_id]  = 0.0
+            overlap_p1[ablation_id] = 0.0
+            overlap_p3[ablation_id] = 0.0
+            overlap_r3[ablation_id] = 0.0
             continue
 
         resolved_urls: list[str] = []
         for eu in expected_urls:
-            r = _resolve_billy_url(eu, slug_map)
+            r = _resolve_legacy_url(eu, slug_map)
             if r and r not in resolved_urls:
                 resolved_urls.append(r)
 
@@ -227,9 +253,9 @@ def compute_bkh_retrieval_stats(bkh: dict, configs: dict) -> dict:
         top3_hits = sum(1 for u in top3 if u in golden_set)
 
         overlap_mrr[ablation_id] = mrr
-        overlap_p1[ablation_id]  = 1.0 if resolved_urls and resolved_urls[0] in golden_set else 0.0
-        overlap_p3[ablation_id]  = top3_hits / 3 if top3 else 0.0
-        overlap_r3[ablation_id]  = top3_hits / len(golden_set) if golden_set else 0.0
+        overlap_p1[ablation_id] = 1.0 if resolved_urls and resolved_urls[0] in golden_set else 0.0
+        overlap_p3[ablation_id] = top3_hits / 3 if top3 else 0.0
+        overlap_r3[ablation_id] = top3_hits / len(golden_set) if golden_set else 0.0
 
     # Denominator = all annotated eval tasks (BKH scores 0 on non-overlapping tasks)
     n_annotated_eval = sum(1 for urls in ablation_golden.values() if urls)
@@ -259,10 +285,8 @@ def load_quality_grades() -> dict[str, dict]:
     if not QUALITY_DIR.exists():
         return grades
     for p in QUALITY_DIR.glob("*.json"):
-        try:
+        with contextlib.suppress(Exception):
             grades[p.stem] = json.loads(p.read_text())
-        except Exception:
-            pass
     return grades
 
 
@@ -309,6 +333,7 @@ def _bkh_ablation_overlap_ids(bkh: dict, configs: dict) -> set[str]:
 # Statistical significance
 # ---------------------------------------------------------------------------
 
+
 def compute_significance(configs: dict, top_n: int = 5) -> list[dict]:
     """Bootstrap 95% CI for MRR delta between all pairs of top-N configs.
 
@@ -340,7 +365,7 @@ def compute_significance(configs: dict, top_n: int = 5) -> list[dict]:
     rng = np.random.default_rng(42)
     results = []
     for i, a in enumerate(keys):
-        for b in keys[i + 1:]:
+        for b in keys[i + 1 :]:
             a_mrr = np.array([per_task[tid][a] for tid in shared_tids])
             b_mrr = np.array([per_task[tid][b] for tid in shared_tids])
             n = len(shared_tids)
@@ -350,14 +375,21 @@ def compute_significance(configs: dict, top_n: int = 5) -> list[dict]:
             for _ in range(5000):
                 idx = rng.integers(0, n, n)
                 boot_deltas.append(float(a_mrr[idx].mean() - b_mrr[idx].mean()))
-            ci_lo, ci_hi = float(np.percentile(boot_deltas, 2.5)), float(np.percentile(boot_deltas, 97.5))
-            results.append({
-                "a": a, "b": b,
-                "delta": obs_delta,
-                "ci_lo": ci_lo, "ci_hi": ci_hi,
-                "n": n,
-                "significant": ci_lo > 0 or ci_hi < 0,
-            })
+            ci_lo, ci_hi = (
+                float(np.percentile(boot_deltas, 2.5)),
+                float(np.percentile(boot_deltas, 97.5)),
+            )
+            results.append(
+                {
+                    "a": a,
+                    "b": b,
+                    "delta": obs_delta,
+                    "ci_lo": ci_lo,
+                    "ci_hi": ci_hi,
+                    "n": n,
+                    "significant": ci_lo > 0 or ci_hi < 0,
+                }
+            )
 
     return sorted(results, key=lambda x: abs(x["delta"]), reverse=True)
 
@@ -367,11 +399,11 @@ def compute_power_requirements() -> dict:
     if not _HAS_NUMPY:
         return {}
     from scipy.stats import norm  # type: ignore[import]
+
     z_a, z_b = norm.ppf(0.975), norm.ppf(0.8)
     sd = 0.44  # typical SD of per-task reciprocal ranks (binary-ish)
     return {
-        delta: int(((z_a + z_b) * sd / delta) ** 2 * 2)
-        for delta in [0.05, 0.07, 0.10, 0.15, 0.20]
+        delta: int(((z_a + z_b) * sd / delta) ** 2 * 2) for delta in [0.05, 0.07, 0.10, 0.15, 0.20]
     }
 
 
@@ -379,8 +411,10 @@ def compute_power_requirements() -> dict:
 # Discriminative tasks
 # ---------------------------------------------------------------------------
 
-def find_discriminative_tasks(config_keys: list[str], tasks: list[dict],
-                               top_keys: list[str] | None = None) -> list[dict]:
+
+def find_discriminative_tasks(
+    config_keys: list[str], tasks: list[dict], top_keys: list[str] | None = None
+) -> list[dict]:
     """Return annotated tasks ranked by how much configs disagree.
 
     Uses variance in per-task MRR across configs: tasks where half hit and half miss
@@ -409,7 +443,10 @@ def find_discriminative_tasks(config_keys: list[str], tasks: list[dict],
 # Build unified task view
 # ---------------------------------------------------------------------------
 
-def build_task_matrix(configs: dict[str, dict], va_smoke: dict | None, bkh: dict) -> tuple[list[str], list[dict]]:
+
+def build_task_matrix(
+    configs: dict[str, dict], va_smoke: dict | None, bkh: dict
+) -> tuple[list[str], list[dict]]:
     """Returns (ordered_config_keys, tasks_with_per_config_results)."""
     config_keys = [k for k in _CONFIG_LABELS if k in configs]
 
@@ -469,6 +506,7 @@ def build_task_matrix(configs: dict[str, dict], va_smoke: dict | None, bkh: dict
 # Metrics helpers
 # ---------------------------------------------------------------------------
 
+
 def _f1(p: float, r: float) -> float:
     return 2 * p * r / (p + r) if (p + r) > 0 else 0.0
 
@@ -498,14 +536,14 @@ def _pct(v: float) -> str:
 
 
 def _ms(v: float) -> str:
-    return f"{v/1000:.1f}s"
+    return f"{v / 1000:.1f}s"
 
 
 def _cost_cell(config_key: str) -> str:
     est, tip = _CONFIG_COST.get(config_key, ("—", "no estimate"))
     return (
         f'<td style="text-align:center;font-size:.82em" title="{tip} · per 1K queries">'
-        f'<b>{est}</b></td>'
+        f"<b>{est}</b></td>"
     )
 
 
@@ -535,7 +573,10 @@ def _category_badge(cat: str) -> str:
 # Per-category breakdown
 # ---------------------------------------------------------------------------
 
-def build_category_breakdown(config_keys: list[str], tasks: list[dict]) -> dict[str, dict[str, dict]]:
+
+def build_category_breakdown(
+    config_keys: list[str], tasks: list[dict]
+) -> dict[str, dict[str, dict]]:
     """category → config_key → {mrr_sum, n, n_annotated}"""
     cats: dict[str, dict[str, dict]] = {}
     for row in tasks:
@@ -615,14 +656,15 @@ def _summary_card(label: str, value: str, sub: str = "") -> str:
         f'<div class="stat-card">'
         f'<div class="stat-label">{label}</div>'
         f'<div class="stat-value">{value}</div>'
-        f'{"<div class=stat-sub>" + sub + "</div>" if sub else ""}'
-        f'</div>'
+        f"{'<div class=stat-sub>' + sub + '</div>' if sub else ''}"
+        f"</div>"
     )
 
 
 # ---------------------------------------------------------------------------
 # Report sections
 # ---------------------------------------------------------------------------
+
 
 def _qual_cell(summary: dict, metric: str) -> str:
     """Render a quality metric cell.
@@ -634,7 +676,7 @@ def _qual_cell(summary: dict, metric: str) -> str:
     if metric not in summary:
         return '<td style="text-align:center;color:#aaa;font-size:.82em">—</td>'
     s = summary[metric]
-    pr  = s.get("pass_rate", 0)
+    pr = s.get("pass_rate", 0)
     cls = "cell-great" if pr >= 0.75 else ("cell-good" if pr >= 0.55 else "cell-ok")
 
     # DeepEval calibration check — present if --calibrate was used
@@ -647,17 +689,12 @@ def _qual_cell(summary: dict, metric: str) -> str:
         de_color = "#dc2626" if gap > 0.20 else ("#92400e" if gap > 0.08 else "#16a34a")
         cal_html = (
             f'<span style="font-size:.70em;color:{de_color}" title="DeepEval calibrated pass%">'
-            f'{de_pr*100:.0f}% cal.</span>'
+            f"{de_pr * 100:.0f}% cal.</span>"
         )
     else:
         cal_html = '<span style="font-size:.68em;color:#94a3b8" title="Run --calibrate to validate">⚠️ uncal.</span>'
 
-    return (
-        f'<td class="{cls}" style="text-align:center">'
-        f'<b>{pr*100:.0f}%</b>'
-        f'<br>{cal_html}'
-        f'</td>'
-    )
+    return f'<td class="{cls}" style="text-align:center"><b>{pr * 100:.0f}%</b><br>{cal_html}</td>'
 
 
 def _resolution_rate(data: dict) -> float | None:
@@ -673,33 +710,47 @@ def _res_cell(rate: float | None, na_colspan: int = 1) -> str:
     if rate is None:
         return f'<td style="text-align:center;color:#aaa;font-size:.82em" colspan="{na_colspan}">N/A</td>'
     cls = "cell-great" if rate >= 0.90 else ("cell-good" if rate >= 0.75 else "cell-ok")
-    return f'<td class="{cls}" style="text-align:center;font-weight:600">{rate*100:.0f}%</td>'
+    return f'<td class="{cls}" style="text-align:center;font-weight:600">{rate * 100:.0f}%</td>'
 
 
-def _section_aggregate(config_keys: list[str], configs: dict, va_smoke: dict | None,
-                       bkh_stats: dict | None = None,
-                       quality_grades: dict | None = None,
-                       va_quality_summary: dict | None = None,
-                       bkh_quality_summary: dict | None = None) -> str:
-
+def _section_aggregate(
+    config_keys: list[str],
+    configs: dict,
+    va_smoke: dict | None,
+    bkh_stats: dict | None = None,
+    quality_grades: dict | None = None,
+    va_quality_summary: dict | None = None,
+    bkh_quality_summary: dict | None = None,
+) -> str:
     qual = quality_grades or {}
     quality_metrics = ["answer_relevancy", "completeness", "escalation"]
     # Columns: config + n + resolution + MRR + P@1 + P@3 + R@3 + F1@3 + avg_lat + p50 + cost + 3 quality = 14
     ncols = 14
 
-    def _row(name: str, spec: str, agg: dict, n_tasks: int, n_ann: int,
-             smoke_only: bool = False, lat_str: str | None = None,
-             qual_summary: dict | None = None,
-             resolution: float | None = None,
-             config_key: str = "") -> str:
+    def _row(
+        name: str,
+        spec: str,
+        agg: dict,
+        n_tasks: int,
+        n_ann: int,
+        smoke_only: bool = False,
+        lat_str: str | None = None,
+        qual_summary: dict | None = None,
+        resolution: float | None = None,
+        config_key: str = "",
+    ) -> str:
         mrr = agg.get("mrr", 0)
-        p1  = agg.get("p@1", 0)
-        p3  = agg.get("p@3", 0)
-        r3  = agg.get("r@3", 0)
+        p1 = agg.get("p@1", 0)
+        p3 = agg.get("p@3", 0)
+        r3 = agg.get("r@3", 0)
         f1_3 = agg.get("f1@3") if "f1@3" in agg else _f1(p3, r3)
         lat = agg.get("avg_latency_ms", 0)
         p50 = agg.get("p50_latency_ms", 0)
-        smoke_tag = ' <span class="badge b-info" style="font-size:.7em">smoke/10</span>' if smoke_only else ""
+        smoke_tag = (
+            ' <span class="badge b-info" style="font-size:.7em">smoke/10</span>'
+            if smoke_only
+            else ""
+        )
         if lat_str is not None:
             lat_cell = lat_str
             p50_cell = ""
@@ -708,7 +759,11 @@ def _section_aggregate(config_keys: list[str], configs: dict, va_smoke: dict | N
             p50_cell = f'<td style="text-align:center;color:#888;font-size:.82em">{_ms(p50)}</td>'
         qs = qual_summary or {}
         qual_cells = "".join(_qual_cell(qs, m) for m in quality_metrics)
-        cost_cell = _cost_cell(config_key) if config_key else '<td style="text-align:center;color:#aaa">—</td>'
+        cost_cell = (
+            _cost_cell(config_key)
+            if config_key
+            else '<td style="text-align:center;color:#aaa">—</td>'
+        )
         return (
             f"<tr>"
             f"<td><b>{name}</b>{smoke_tag}<br><span style='color:#888;font-size:.78em'>{spec}</span></td>"
@@ -719,9 +774,9 @@ def _section_aggregate(config_keys: list[str], configs: dict, va_smoke: dict | N
             f'<td style="text-align:center">{_pct(r3)}</td>'
             f'<td style="text-align:center;font-weight:600">{_pct(f1_3)}</td>'
             f"<td style='text-align:center;color:#666;font-size:.82em' title='Tasks with golden URLs for retrieval / total tasks in run'>{n_ann}/{n_tasks}</td>"
-            f'{qual_cells}'
-            f'{lat_cell}{p50_cell}'
-            f'{cost_cell}'
+            f"{qual_cells}"
+            f"{lat_cell}{p50_cell}"
+            f"{cost_cell}"
             f"</tr>"
         )
 
@@ -729,29 +784,33 @@ def _section_aggregate(config_keys: list[str], configs: dict, va_smoke: dict | N
         return (
             f'<tr><td colspan="{ncols}" style="font-size:.72em;font-weight:700;'
             f'text-transform:uppercase;letter-spacing:.05em;color:{color};padding:8px 12px 2px">'
-            f'{label}</td></tr>'
+            f"{label}</td></tr>"
         )
 
     rows_html = ""
 
     # ── BKH (Bookkeeper Hero) — 3rd-party source baseline ───────────────────
     if bkh_stats and bkh_stats.get("n_annotated", 0) > 0:
-        n_ann      = bkh_stats["n_annotated"]
+        n_ann = bkh_stats["n_annotated"]
         n_ann_eval = bkh_stats.get("n_annotated_eval", 32)
-        mrr_ol     = bkh_stats.get("mrr_overlap_only", 0)
-        rows_html += _section_header("📚 3rd-party source baseline (BKH — Bookkeeper Hero)", "#5a1e6e")
+        mrr_ol = bkh_stats.get("mrr_overlap_only", 0)
+        rows_html += _section_header(
+            "📚 3rd-party source baseline (BKH — Bookkeeper Hero)", "#5a1e6e"
+        )
         bkh_agg = {
-            "mrr":   bkh_stats["mrr"],
-            "p@1":   bkh_stats["p@1"],
-            "p@3":   bkh_stats.get("p@3", 0.0),
-            "r@3":   bkh_stats.get("r@3", 0.0),
-            "f1@3":  bkh_stats.get("f1@3", 0.0),
+            "mrr": bkh_stats["mrr"],
+            "p@1": bkh_stats["p@1"],
+            "p@3": bkh_stats.get("p@3", 0.0),
+            "r@3": bkh_stats.get("r@3", 0.0),
+            "f1@3": bkh_stats.get("f1@3", 0.0),
         }
         rows_html += _row(
             "BKH (Bookkeeper Hero)",
-            (f"3rd-party source — MRR over {n_ann_eval} annotated eval tasks "
-             f"({n_ann} overlap; {_pct(mrr_ol)} on overlap-only); "
-             f"quality on {n_ann} liked responses ⚠️ biased high"),
+            (
+                f"3rd-party source — MRR over {n_ann_eval} annotated eval tasks "
+                f"({n_ann} overlap; {_pct(mrr_ol)} on overlap-only); "
+                f"quality on {n_ann} liked responses ⚠️ biased high"
+            ),
             bkh_agg,
             44,
             n_ann,
@@ -791,20 +850,25 @@ def _section_aggregate(config_keys: list[str], configs: dict, va_smoke: dict | N
         if key == "va_staging":
             continue
         data = configs[key]
-        agg  = data.get("aggregate", {})
+        agg = data.get("aggregate", {})
         label, spec = _CONFIG_LABELS.get(key, (key, ""))
         q_summary = qual.get(key, {}).get("grader_summary", {}) if key in qual else None
         q_note = " · quality graded ✓" if q_summary else " · quality: run make grade-ablation-top"
-        rows_html += _row(label, spec + q_note, agg,
-                          data.get("n_tasks", 0), data.get("n_annotated", 0),
-                          qual_summary=q_summary or {},
-                          resolution=_resolution_rate(data),
-                          config_key=key)
+        rows_html += _row(
+            label,
+            spec + q_note,
+            agg,
+            data.get("n_tasks", 0),
+            data.get("n_annotated", 0),
+            qual_summary=q_summary or {},
+            resolution=_resolution_rate(data),
+            config_key=key,
+        )
 
     bkh_n = bkh_stats.get("n_annotated", 0) if bkh_stats else 0
 
     qual_header = "".join(
-        f'<th style="text-align:center">{m.replace("_"," ").title()}<br>'
+        f'<th style="text-align:center">{m.replace("_", " ").title()}<br>'
         f'<span style="font-weight:400;font-size:.8em">pass% / cal%</span></th>'
         for m in quality_metrics
     )
@@ -850,40 +914,64 @@ def _section_aggregate(config_keys: list[str], configs: dict, va_smoke: dict | N
 
 def _section_ablation_insights(config_keys: list[str], configs: dict) -> str:
     insights = [
-        ("THINKING_BUDGET", "hc_adk", "adk_baseline", "adk_thinking1024",
-         "Gemini extended thinking (1024 tokens). Gives the model reasoning budget before composing retrieval queries."),
-        ("CRAG", "hc_lg", "lg_no_crag", "lg_crag",
-         "Corrective RAG: grade passages → rewrite query → re-fetch if quality low. Confidence gate at 0.7 short-circuits when top passage score is high."),
-        ("THINKING_BUDGET + CRAG", "hc_lg", "lg_crag", "lg_crag_thinking1024",
-         "CRAG with thinking enabled on the answer node. Interaction effect: thinking changed citation behaviour, hurting CRAG grading alignment."),
-        ("LLM_PLANNER", "hc_lg", "lg_crag", "lg_llm_planner",
-         "LLM intent classifier (gemini-2.5-flash) vs deterministic regex router. Adds ~1s + 1 LLM call per query."),
+        (
+            "THINKING_BUDGET",
+            "hc_adk",
+            "adk_baseline",
+            "adk_thinking1024",
+            "Gemini extended thinking (1024 tokens). Gives the model reasoning budget before composing retrieval queries.",
+        ),
+        (
+            "CRAG",
+            "hc_lg",
+            "lg_no_crag",
+            "lg_crag",
+            "Corrective RAG: grade passages → rewrite query → re-fetch if quality low. Confidence gate at 0.7 short-circuits when top passage score is high.",
+        ),
+        (
+            "THINKING_BUDGET + CRAG",
+            "hc_lg",
+            "lg_crag",
+            "lg_crag_thinking1024",
+            "CRAG with thinking enabled on the answer node. Interaction effect: thinking changed citation behaviour, hurting CRAG grading alignment.",
+        ),
+        (
+            "LLM_PLANNER",
+            "hc_lg",
+            "lg_crag",
+            "lg_llm_planner",
+            "LLM intent classifier (gemini-2.5-flash) vs deterministic regex router. Adds ~1s + 1 LLM call per query.",
+        ),
     ]
 
     def _delta(a: float, b: float) -> str:
         d = a - b
         s = f"+{_pct(d)}" if d >= 0 else _pct(d)
-        cls = "cell-great" if d > 0.05 else ("cell-good" if d > 0 else ("cell-bad" if d < -0.05 else "cell-ok"))
+        cls = (
+            "cell-great"
+            if d > 0.05
+            else ("cell-good" if d > 0 else ("cell-bad" if d < -0.05 else "cell-ok"))
+        )
         return f'<td class="{cls}" style="text-align:center;font-weight:600">{s}</td>'
 
     rows_html = ""
     for feature, agent, base_key, ablation_key, note in insights:
-        base  = configs.get(base_key, {}).get("aggregate", {})
-        abl   = configs.get(ablation_key, {}).get("aggregate", {})
+        base = configs.get(base_key, {}).get("aggregate", {})
+        abl = configs.get(ablation_key, {}).get("aggregate", {})
         b_mrr = base.get("mrr", 0)
         a_mrr = abl.get("mrr", 0)
         b_r3 = base.get("r@3", 0)
         a_r3 = abl.get("r@3", 0)
-        b_f1  = base.get("f1@3", _f1(base.get("p@3",0), b_r3))
-        a_f1  = abl.get("f1@3",  _f1(abl.get("p@3", 0), a_r3))
+        b_f1 = base.get("f1@3", _f1(base.get("p@3", 0), b_r3))
+        a_f1 = abl.get("f1@3", _f1(abl.get("p@3", 0), a_r3))
         d_lat = abl.get("avg_latency_ms", 0) - base.get("avg_latency_ms", 0)
-        lat_str = f"+{d_lat/1000:.1f}s" if d_lat >= 0 else f"{d_lat/1000:.1f}s"
+        lat_str = f"+{d_lat / 1000:.1f}s" if d_lat >= 0 else f"{d_lat / 1000:.1f}s"
 
         rows_html += (
             f"<tr>"
             f"<td><b>{feature}</b><br><span style='color:#888;font-size:.78em'>{agent}</span></td>"
-            f"<td>{_CONFIG_LABELS.get(base_key, (base_key,''))[0]}</td>"
-            f"<td>{_CONFIG_LABELS.get(ablation_key, (ablation_key,''))[0]}</td>"
+            f"<td>{_CONFIG_LABELS.get(base_key, (base_key, ''))[0]}</td>"
+            f"<td>{_CONFIG_LABELS.get(ablation_key, (ablation_key, ''))[0]}</td>"
             f'<td style="text-align:center">{_pct(b_mrr)} → {_pct(a_mrr)}</td>'
             f"{_delta(a_mrr, b_mrr)}"
             f'<td style="text-align:center">{_pct(b_r3)} → {_pct(a_r3)}</td>'
@@ -913,7 +1001,9 @@ def _section_category_breakdown(config_keys: list[str], configs: dict, tasks: li
     breakdown = build_category_breakdown(config_keys, tasks)
 
     short_labels = {k: _CONFIG_LABELS[k][0][:18] for k in config_keys}
-    header_cells = "".join(f'<th style="text-align:center">{short_labels[k]}</th>' for k in config_keys)
+    header_cells = "".join(
+        f'<th style="text-align:center">{short_labels[k]}</th>' for k in config_keys
+    )
 
     rows_html = ""
     for cat in ["danish_support", "english_support", "escalation", "out_of_scope", "vague"]:
@@ -922,7 +1012,7 @@ def _section_category_breakdown(config_keys: list[str], configs: dict, tasks: li
         cat_data = breakdown[cat]
         badge = _category_badge(cat)
         n_tasks = next(iter(cat_data.values()), {}).get("n", 0)
-        n_ann   = next(iter(cat_data.values()), {}).get("n_annotated", 0)
+        n_ann = next(iter(cat_data.values()), {}).get("n_annotated", 0)
         cells = ""
         for key in config_keys:
             d = cat_data.get(key, {})
@@ -964,17 +1054,19 @@ def _section_per_task(config_keys: list[str], tasks: list[dict], va_smoke: dict 
         for t in va_smoke.get("task_results", []):
             va_by_tid[t["task_id"]] = t
 
-    header_cols = "".join(f'<th style="text-align:center">{short_labels[k]}</th>' for k in config_keys)
+    header_cols = "".join(
+        f'<th style="text-align:center">{short_labels[k]}</th>' for k in config_keys
+    )
     if va_smoke:
         header_cols += '<th style="text-align:center">va_staging<br><span style="font-weight:400;font-size:.85em">(smoke)</span></th>'
-    header_cols += '<th>BKH response</th>'
+    header_cols += "<th>BKH response</th>"
 
     rows_html = ""
     prev_cat = None
     for row in tasks:
         cat = row.get("category", "")
         if cat != prev_cat:
-            rows_html += f'<tr><td colspan="100" style="font-size:.72em;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#555;padding:10px 12px 3px;background:#f8f9fa">{cat.replace("_"," ").upper()}</td></tr>'
+            rows_html += f'<tr><td colspan="100" style="font-size:.72em;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#555;padding:10px 12px 3px;background:#f8f9fa">{cat.replace("_", " ").upper()}</td></tr>'
             prev_cat = cat
 
         q = row["query"][:80] + ("…" if len(row["query"]) > 80 else "")
@@ -1005,13 +1097,17 @@ def _section_per_task(config_keys: list[str], tasks: list[dict], va_smoke: dict 
             resp = (bkh_entry.get("response") or "")[:120].replace("<", "&lt;")
             rating = bkh_entry.get("rating", "?")
             rating_badge = (
-                '<span class="badge b-hit">👍</span>' if rating == 1.0
-                else '<span class="badge b-miss">👎</span>' if rating == 0.0
+                '<span class="badge b-hit">👍</span>'
+                if rating == 1.0
+                else '<span class="badge b-miss">👎</span>'
+                if rating == 0.0
                 else f'<span class="badge b-info">{rating}</span>'
             )
             ft = bkh_entry.get("failure_type", "")
             ft_badge = f' <span class="badge b-na">{ft}</span>' if ft and ft != "none" else ""
-            bkh_cell = f'<td><span class="resp-excerpt">{resp}…</span><br>{rating_badge}{ft_badge}</td>'
+            bkh_cell = (
+                f'<td><span class="resp-excerpt">{resp}…</span><br>{rating_badge}{ft_badge}</td>'
+            )
         else:
             bkh_cell = '<td style="color:#aaa;font-size:.8em">new task</td>'
 
@@ -1074,7 +1170,7 @@ def _section_failure_modes(config_keys: list[str], tasks: list[dict]) -> str:
         return "no_retrieval"
 
     modes = ["hit", "wrong_rank", "wrong_article", "no_retrieval", "correct_oos"]
-    counts: dict[str, dict[str, int]] = {k: {m: 0 for m in modes} for k in config_keys}
+    counts: dict[str, dict[str, int]] = {k: dict.fromkeys(modes, 0) for k in config_keys}
     for row in tasks:
         for key in config_keys:
             m = classify(row, key)
@@ -1125,16 +1221,16 @@ def _section_quality_graders(va_quality: dict | None, bkh: dict) -> str:
             if metric not in grader_summary:
                 continue
             g = grader_summary[metric]
-            avg  = g.get("avg_score", 0)
-            n    = g.get("n_graded", 0)
-            pr   = g.get("pass_rate", 0)
+            avg = g.get("avg_score", 0)
+            n = g.get("n_graded", 0)
+            pr = g.get("pass_rate", 0)
             score_cls = "cell-great" if avg >= 0.85 else ("cell-good" if avg >= 0.70 else "cell-ok")
             rows += (
                 f"<tr>"
                 f"<td>{metric.replace('_', ' ').title()}</td>"
                 f'<td style="text-align:center">{n}</td>'
                 f'<td class="{score_cls}" style="text-align:center;font-weight:600">{avg:.3f}</td>'
-                f'<td style="text-align:center">{pr*100:.1f}%</td>'
+                f'<td style="text-align:center">{pr * 100:.1f}%</td>'
                 f"</tr>"
             )
         return rows
@@ -1142,7 +1238,7 @@ def _section_quality_graders(va_quality: dict | None, bkh: dict) -> str:
     # Build va_staging grader table
     if va_quality:
         va_gs = va_quality.get("grader_summary", {})
-        va_n  = va_quality.get("n_queries", 0)
+        va_n = va_quality.get("n_queries", 0)
         va_table = f"""
 <h3>va_staging — {va_n} production queries</h3>
 <table>
@@ -1202,9 +1298,21 @@ def _section_quality_graders(va_quality: dict | None, bkh: dict) -> str:
 def _section_report_index() -> str:
     """Links to related eval reports."""
     links = [
-        ("BKH eval suite",       "../../bkh/all_suite.html",                   "Full BKH regression eval suite — per-task grader results across the full train/test split"),
-        ("BKH eval stats",       "../../bkh/all_stats.html",                   "BKH aggregate statistics — category breakdown, pass rates, failure type distribution"),
-        ("VA staging quality",   "../../va/va-staging_suite.html",  "VA staging LLM grader suite (regenerate via eval_quality)"),
+        (
+            "BKH eval suite",
+            "../../bkh/all_suite.html",
+            "Full BKH regression eval suite — per-task grader results across the full train/test split",
+        ),
+        (
+            "BKH eval stats",
+            "../../bkh/all_stats.html",
+            "BKH aggregate statistics — category breakdown, pass rates, failure type distribution",
+        ),
+        (
+            "VA staging quality",
+            "../../va/va-staging_suite.html",
+            "VA staging LLM grader suite (regenerate via eval_quality)",
+        ),
     ]
     rows = "".join(
         f"<tr>"
@@ -1222,8 +1330,7 @@ def _section_report_index() -> str:
 """
 
 
-def _ci_bar_svg(lo: float, hi: float, delta: float,
-                v_min: float, v_max: float) -> str:
+def _ci_bar_svg(lo: float, hi: float, delta: float, v_min: float, v_max: float) -> str:
     """Inline SVG forest-plot CI bar. Red dashed line at zero."""
     W, H, pad = 180, 18, 10
     chart_w = W - 2 * pad
@@ -1240,23 +1347,23 @@ def _ci_bar_svg(lo: float, hi: float, delta: float,
     return (
         f'<svg width="{W}" height="{H}" style="vertical-align:middle;overflow:visible">'
         # Background axis
-        f'<line x1="{pad}" y1="{H//2}" x2="{W-pad}" y2="{H//2}" '
+        f'<line x1="{pad}" y1="{H // 2}" x2="{W - pad}" y2="{H // 2}" '
         f'stroke="#e2e8f0" stroke-width="1"/>'
         # Zero reference line (red dashed)
-        f'<line x1="{x_zero}" y1="1" x2="{x_zero}" y2="{H-1}" '
+        f'<line x1="{x_zero}" y1="1" x2="{x_zero}" y2="{H - 1}" '
         f'stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,2"/>'
         # CI interval bar
-        f'<line x1="{x0}" y1="{H//2}" x2="{x1}" y2="{H//2}" '
+        f'<line x1="{x0}" y1="{H // 2}" x2="{x1}" y2="{H // 2}" '
         f'stroke="{bar_color}" stroke-width="4" stroke-linecap="round"/>'
         # CI end caps
-        f'<line x1="{x0}" y1="{H//2-5}" x2="{x0}" y2="{H//2+5}" '
+        f'<line x1="{x0}" y1="{H // 2 - 5}" x2="{x0}" y2="{H // 2 + 5}" '
         f'stroke="{bar_color}" stroke-width="1.5"/>'
-        f'<line x1="{x1}" y1="{H//2-5}" x2="{x1}" y2="{H//2+5}" '
+        f'<line x1="{x1}" y1="{H // 2 - 5}" x2="{x1}" y2="{H // 2 + 5}" '
         f'stroke="{bar_color}" stroke-width="1.5"/>'
         # Point estimate diamond
-        f'<polygon points="{xd},{H//2-5} {xd+4},{H//2} {xd},{H//2+5} {xd-4},{H//2}" '
+        f'<polygon points="{xd},{H // 2 - 5} {xd + 4},{H // 2} {xd},{H // 2 + 5} {xd - 4},{H // 2}" '
         f'fill="{bar_color}" stroke="white" stroke-width="1"/>'
-        f'</svg>'
+        f"</svg>"
     )
 
 
@@ -1276,13 +1383,16 @@ def _section_significance(sig_results: list[dict], power_req: dict) -> str:
     for r in sig_results[:12]:
         a_label = _CONFIG_LABELS.get(r["a"], (r["a"], ""))[0]
         b_label = _CONFIG_LABELS.get(r["b"], (r["b"], ""))[0]
-        delta   = r["delta"]
-        lo, hi  = r["ci_lo"], r["ci_hi"]
-        sig     = r["significant"]
+        delta = r["delta"]
+        lo, hi = r["ci_lo"], r["ci_hi"]
+        sig = r["significant"]
         delta_str = f"+{delta:.3f}" if delta >= 0 else f"{delta:.3f}"
-        ci_str    = f"[{lo:+.3f}, {hi:+.3f}]"
-        sig_badge = ('<span class="badge b-hit">SIG ✓</span>' if sig
-                     else '<span class="badge b-na">not sig</span>')
+        ci_str = f"[{lo:+.3f}, {hi:+.3f}]"
+        sig_badge = (
+            '<span class="badge b-hit">SIG ✓</span>'
+            if sig
+            else '<span class="badge b-na">not sig</span>'
+        )
         row_cls = ' class="highlight-row"' if sig else ""
         ci_bar = _ci_bar_svg(lo, hi, delta, v_min, v_max)
         rows_html += (
@@ -1348,8 +1458,9 @@ def _section_significance(sig_results: list[dict], power_req: dict) -> str:
 """
 
 
-def _section_discriminative_tasks(config_keys: list[str], tasks: list[dict],
-                                   top_keys: list[str]) -> str:
+def _section_discriminative_tasks(
+    config_keys: list[str], tasks: list[dict], top_keys: list[str]
+) -> str:
     disc = find_discriminative_tasks(config_keys, tasks, top_keys)
     if not disc:
         return ""
@@ -1383,9 +1494,9 @@ def _section_discriminative_tasks(config_keys: list[str], tasks: list[dict],
         rows_html += (
             f"<tr>"
             f'<td class="query-text">{q}<br><span style="color:#888;font-size:.75em">{slug}</span></td>'
-            f'<td>{_category_badge(cat)}</td>'
+            f"<td>{_category_badge(cat)}</td>"
             f'<td style="text-align:center">{bar} <span style="font-size:.78em;color:#888">{hit_rate:.0%}</span></td>'
-            f'{cells}</tr>'
+            f"{cells}</tr>"
         )
 
     return f"""
@@ -1462,34 +1573,36 @@ def _section_roadmap() -> str:
 # Main
 # ---------------------------------------------------------------------------
 
+
 def generate_report(out_path: Path) -> None:
-    configs          = load_ablation_files()
-    va_smoke         = load_va_staging_smoke()
-    bkh              = load_bkh_quality()
-    va_quality       = load_va_staging_quality()
-    quality_grades   = load_quality_grades()
+    configs = load_ablation_files()
+    va_smoke = load_va_staging_smoke()
+    bkh = load_bkh_quality()
+    va_quality = load_va_staging_quality()
+    quality_grades = load_quality_grades()
 
     if not configs:
         print("No ablation JSON files found in", ABLATION_DIR)
         return
 
-    bkh_stats          = compute_bkh_retrieval_stats(bkh, configs)
-    bkh_overlap_ids    = _bkh_ablation_overlap_ids(bkh, configs)
+    bkh_stats = compute_bkh_retrieval_stats(bkh, configs)
+    bkh_overlap_ids = _bkh_ablation_overlap_ids(bkh, configs)
     # Quality sources (prefer 44-task graded file; fall back to 488-query production file):
     # - va_staging: quality_grades["va_staging"] if run, else 488-query production graded.json
     # - BKH: filtered to 9 overlap task IDs (same tasks as retrieval eval)
     # - Local agents: from quality_grades (run make grade-ablation-top)
-    va_quality_sum     = (quality_grades.get("va_staging", {}).get("grader_summary")
-                          or _aggregate_va_staging_quality(va_quality))
-    bkh_quality_sum    = _aggregate_bkh_quality(bkh, filter_to_ablation_ids=bkh_overlap_ids)
-    sig_results        = compute_significance(configs)
-    power_req          = compute_power_requirements()
+    va_quality_sum = quality_grades.get("va_staging", {}).get(
+        "grader_summary"
+    ) or _aggregate_va_staging_quality(va_quality)
+    bkh_quality_sum = _aggregate_bkh_quality(bkh, filter_to_ablation_ids=bkh_overlap_ids)
+    sig_results = compute_significance(configs)
+    power_req = compute_power_requirements()
     config_keys, tasks = build_task_matrix(configs, va_smoke, bkh)
 
-    n_tasks     = len(tasks)
+    n_tasks = len(tasks)
     n_annotated = sum(1 for t in tasks if t.get("golden_urls"))
-    n_categories = len(set(t.get("category", "") for t in tasks))
-    generated   = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+    n_categories = len({t.get("category", "") for t in tasks})
+    generated = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     header = f"""<!DOCTYPE html>
 <html lang="en">
@@ -1511,21 +1624,23 @@ def generate_report(out_path: Path) -> None:
 """
 
     # Top-level stat cards
-    best_mrr = max(
-        configs[k].get("aggregate", {}).get("mrr", 0) for k in config_keys
-    )
-    best_config = max(
-        config_keys, key=lambda k: configs[k].get("aggregate", {}).get("mrr", 0)
-    )
-    va_full  = configs.get("va_staging", {})
+    best_mrr = max(configs[k].get("aggregate", {}).get("mrr", 0) for k in config_keys)
+    best_config = max(config_keys, key=lambda k: configs[k].get("aggregate", {}).get("mrr", 0))
+    va_full = configs.get("va_staging", {})
     va_bench = va_full if va_full.get("n_tasks", 0) >= 44 else (va_smoke or {})
-    va_mrr   = va_bench.get("aggregate", {}).get("mrr", 0) if va_bench else 0
-    bkh_mrr  = bkh_stats.get("mrr", 0) if bkh_stats else 0
+    va_mrr = va_bench.get("aggregate", {}).get("mrr", 0) if va_bench else 0
+    bkh_mrr = bkh_stats.get("mrr", 0) if bkh_stats else 0
 
-    header += _summary_card("BKH MRR ⚠️", _pct(bkh_mrr), f"{bkh_stats.get('n_annotated',0)} tasks (not comparable)")
+    header += _summary_card(
+        "BKH MRR ⚠️", _pct(bkh_mrr), f"{bkh_stats.get('n_annotated', 0)} tasks (not comparable)"
+    )
     header += _summary_card("va_staging MRR", _pct(va_mrr), "production benchmark")
-    header += _summary_card("Best local MRR", _pct(best_mrr), _CONFIG_LABELS.get(best_config, (best_config,""))[0])
-    header += _summary_card("Gap to va_staging", _pct(best_mrr - va_mrr), "best local vs production")
+    header += _summary_card(
+        "Best local MRR", _pct(best_mrr), _CONFIG_LABELS.get(best_config, (best_config, ""))[0]
+    )
+    header += _summary_card(
+        "Gap to va_staging", _pct(best_mrr - va_mrr), "best local vs production"
+    )
     header += _summary_card("Tasks evaluated", str(n_tasks), f"{n_annotated} annotated")
 
     header += "</div>\n"
@@ -1541,8 +1656,15 @@ def generate_report(out_path: Path) -> None:
     sections = [
         header,
         _section_report_index(),
-        _section_aggregate(config_keys, configs, va_smoke, bkh_stats,
-                           quality_grades, va_quality_sum, bkh_quality_sum),
+        _section_aggregate(
+            config_keys,
+            configs,
+            va_smoke,
+            bkh_stats,
+            quality_grades,
+            va_quality_sum,
+            bkh_quality_sum,
+        ),
         _section_significance(sig_results, power_req),
         _section_discriminative_tasks(config_keys, tasks, top_keys),
         _section_quality_graders(va_quality, bkh),
@@ -1577,6 +1699,7 @@ def _export_figures_from_report(configs: dict, config_keys: list[str]) -> None:
             fig_power_curve,
             fig_va_pass_rates,
         )
+
         _style()
 
         # Build display-labelled config dict for the MRR chart
@@ -1588,10 +1711,10 @@ def _export_figures_from_report(configs: dict, config_keys: list[str]) -> None:
 
         print("\nExporting SVG figures from live report data →")
         fig_mrr_comparison(display_configs)
-        fig_feature_impact()   # uses hardcoded deltas (notebook-derived)
+        fig_feature_impact()  # uses hardcoded deltas (notebook-derived)
         fig_power_curve()
-        fig_bkh_pass_rates()   # uses hardcoded calibration values
-        fig_va_pass_rates()    # uses hardcoded VA staging values
+        fig_bkh_pass_rates()  # uses hardcoded calibration values
+        fig_va_pass_rates()  # uses hardcoded VA staging values
     except ImportError as exc:
         print(f"  ⚠ SVG export skipped — matplotlib not available: {exc}")
     except Exception as exc:
@@ -1601,8 +1724,9 @@ def _export_figures_from_report(configs: dict, config_keys: list[str]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=DEFAULT_OUT)
-    parser.add_argument("--no-figures", action="store_true",
-                        help="Skip SVG figure export (HTML report only)")
+    parser.add_argument(
+        "--no-figures", action="store_true", help="Skip SVG figure export (HTML report only)"
+    )
     args = parser.parse_args()
     generate_report(args.output)
 

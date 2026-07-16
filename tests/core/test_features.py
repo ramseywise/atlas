@@ -54,9 +54,9 @@ class TestRollingFeatures:
     def test_no_future_leakage(self, seq_df):
         # roll_mean_7d at position i uses only positions [i-6..i]
         for sid in seq_df["series_id"].unique().to_list()[:1]:
-            s = add_rolling_features(
-                seq_df.filter(pl.col("series_id") == sid), windows=[7]
-            ).sort("date")
+            s = add_rolling_features(seq_df.filter(pl.col("series_id") == sid), windows=[7]).sort(
+                "date"
+            )
             vals = s["value"].to_numpy()
             means = s["roll_mean_7d"].to_numpy()
             for i in range(6, min(20, len(vals))):

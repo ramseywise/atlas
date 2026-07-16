@@ -5,15 +5,13 @@ All inter-agent data flows through these typed models — no loose dicts.
 
 from __future__ import annotations
 
+import operator
 from datetime import date
 from enum import Enum
-import operator
 from typing import Annotated
 
-import numpy as np
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import TypedDict
-
 
 # ── Enums ────────────────────────────────────────────────────────────────────
 
@@ -79,7 +77,7 @@ class ForecastResult(BaseModel):
 
     @model_validator(mode="after")
     def check_interval_consistency(self) -> ForecastResult:
-        for lo, pt, hi in zip(self.lower_80, self.point_forecast, self.upper_80):
+        for lo, pt, hi in zip(self.lower_80, self.point_forecast, self.upper_80, strict=False):
             if not (lo <= pt <= hi):
                 raise ValueError(
                     f"Interval violated: lower={lo:.2f} > point={pt:.2f} or point > upper={hi:.2f}"

@@ -1,4 +1,5 @@
 """Unit tests for core/segmentation/algorithms.py."""
+
 from __future__ import annotations
 
 import numpy as np

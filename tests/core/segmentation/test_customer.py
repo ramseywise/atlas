@@ -1,4 +1,5 @@
 """Unit tests for core/preprocessing/customer.py."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -16,12 +17,14 @@ from core.preprocessing.synthetic import generate_sequence_dataset
 def canonical_df():
     """Single-customer canonical DataFrame derived from synthetic data."""
     df = generate_sequence_dataset(n_days=365, seed=42)
-    return df.with_columns([
-        pl.lit("cust-001").alias("customer_id"),
-        pl.col("source").alias("source"),
-        pl.col("sign").alias("sign"),
-        pl.col("value").alias("amount"),
-    ])
+    return df.with_columns(
+        [
+            pl.lit("cust-001").alias("customer_id"),
+            pl.col("source").alias("source"),
+            pl.col("sign").alias("sign"),
+            pl.col("value").alias("amount"),
+        ]
+    )
 
 
 class TestBuildCustomerProfiles:
@@ -51,12 +54,14 @@ class TestBuildCustomerProfiles:
         for i in range(3):
             df = generate_sequence_dataset(n_days=200, seed=i)
             frames.append(
-                df.with_columns([
-                    pl.lit(f"cust-{i:03d}").alias("customer_id"),
-                    pl.col("source").alias("source"),
-                    pl.col("sign").alias("sign"),
-                    pl.col("value").alias("amount"),
-                ])
+                df.with_columns(
+                    [
+                        pl.lit(f"cust-{i:03d}").alias("customer_id"),
+                        pl.col("source").alias("source"),
+                        pl.col("sign").alias("sign"),
+                        pl.col("value").alias("amount"),
+                    ]
+                )
             )
         multi_df = pl.concat(frames)
         profiles = build_customer_profiles(multi_df)

@@ -15,7 +15,7 @@ Feature groups:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 import polars as pl
@@ -33,7 +33,7 @@ class CustomerProfile:
 
     # Volatility
     daily_net_std: float
-    inflow_cv: float        # coefficient of variation on daily inflows
+    inflow_cv: float  # coefficient of variation on daily inflows
     outflow_cv: float
 
     # Seasonality (autocorrelation at lag-7 and lag-30)
@@ -44,41 +44,52 @@ class CustomerProfile:
     trend_slope_norm: float
 
     # Recency
-    activity_last_30d: float   # fraction of total volume in last 30 days
+    activity_last_30d: float  # fraction of total volume in last 30 days
     activity_last_90d: float
 
     # Mix
-    inflow_share: float        # inflow / (inflow + outflow)
-    top_source: str            # source with highest volume
-    top_source_share: float    # that source's share of total volume
+    inflow_share: float  # inflow / (inflow + outflow)
+    top_source: str  # source with highest volume
+    top_source_share: float  # that source's share of total volume
 
     def to_feature_vector(self) -> np.ndarray:
-        return np.array([
-            self.total_inflow,
-            self.total_outflow,
-            self.net_position,
-            self.n_active_series,
-            self.daily_net_std,
-            self.inflow_cv,
-            self.outflow_cv,
-            self.weekly_autocorr,
-            self.monthly_autocorr,
-            self.trend_slope_norm,
-            self.activity_last_30d,
-            self.activity_last_90d,
-            self.inflow_share,
-            self.top_source_share,
-        ], dtype=np.float32)
+        return np.array(
+            [
+                self.total_inflow,
+                self.total_outflow,
+                self.net_position,
+                self.n_active_series,
+                self.daily_net_std,
+                self.inflow_cv,
+                self.outflow_cv,
+                self.weekly_autocorr,
+                self.monthly_autocorr,
+                self.trend_slope_norm,
+                self.activity_last_30d,
+                self.activity_last_90d,
+                self.inflow_share,
+                self.top_source_share,
+            ],
+            dtype=np.float32,
+        )
 
     @classmethod
     def feature_names(cls) -> list[str]:
         return [
-            "total_inflow", "total_outflow", "net_position", "n_active_series",
-            "daily_net_std", "inflow_cv", "outflow_cv",
-            "weekly_autocorr", "monthly_autocorr",
+            "total_inflow",
+            "total_outflow",
+            "net_position",
+            "n_active_series",
+            "daily_net_std",
+            "inflow_cv",
+            "outflow_cv",
+            "weekly_autocorr",
+            "monthly_autocorr",
             "trend_slope_norm",
-            "activity_last_30d", "activity_last_90d",
-            "inflow_share", "top_source_share",
+            "activity_last_30d",
+            "activity_last_90d",
+            "inflow_share",
+            "top_source_share",
         ]
 
 
@@ -103,9 +114,7 @@ def build_customer_profiles(
 
     for cid in df[customer_col].unique().to_list():
         cdf = df.filter(pl.col(customer_col) == cid)
-        profiles[cid] = _profile_one_customer(
-            cdf, cid, date_col, amount_col, sign_col, source_col
-        )
+        profiles[cid] = _profile_one_customer(cdf, cid, date_col, amount_col, sign_col, source_col)
 
     return profiles
 
@@ -123,9 +132,9 @@ def _profile_one_customer(
 
     signed = df.with_columns(
         pl.when(pl.col(sign_col) == "inflow")
-          .then(pl.col(amount_col))
-          .otherwise(-pl.col(amount_col))
-          .alias("signed_amount")
+        .then(pl.col(amount_col))
+        .otherwise(-pl.col(amount_col))
+        .alias("signed_amount")
     )
 
     # ── Volume ────────────────────────────────────────────────────────────────
@@ -135,11 +144,7 @@ def _profile_one_customer(
     n_active_series = df[source_col].n_unique()
 
     # ── Daily net aggregation (for volatility + trend) ────────────────────────
-    daily = (
-        signed.group_by(date_col)
-        .agg(pl.col("signed_amount").sum().alias("net"))
-        .sort(date_col)
-    )
+    daily = signed.group_by(date_col).agg(pl.col("signed_amount").sum().alias("net")).sort(date_col)
     daily_net = daily["net"].to_numpy()
 
     daily_net_std = float(np.std(daily_net)) if len(daily_net) > 1 else 0.0
@@ -152,12 +157,14 @@ def _profile_one_customer(
 
     inflow_daily = (
         df.filter(pl.col(sign_col) == "inflow")
-        .group_by(date_col).agg(pl.col(amount_col).sum().alias("v"))
+        .group_by(date_col)
+        .agg(pl.col(amount_col).sum().alias("v"))
         .sort(date_col)["v"]
     )
     outflow_daily = (
         df.filter(pl.col(sign_col) == "outflow")
-        .group_by(date_col).agg(pl.col(amount_col).sum().alias("v"))
+        .group_by(date_col)
+        .agg(pl.col(amount_col).sum().alias("v"))
         .sort(date_col)["v"]
     )
     inflow_cv = _cv(inflow_daily) if len(inflow_daily) > 1 else 0.0

@@ -11,7 +11,6 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-import numpy as np
 import polars as pl
 import pytest
 
@@ -24,17 +23,18 @@ def _make_customer_parquet(n_customers: int = 8, n_days: int = 200, seed: int = 
     for i in range(n_customers):
         df = generate_sequence_dataset(n_days=n_days, seed=seed + i)
         frames.append(
-            df.with_columns([
-                pl.lit(f"cust-{i:03d}").alias("customer_id"),
-                pl.col("source").alias("source"),
-                pl.col("sign").alias("sign"),
-                pl.col("value").alias("amount"),
-            ])
+            df.with_columns(
+                [
+                    pl.lit(f"cust-{i:03d}").alias("customer_id"),
+                    pl.col("source").alias("source"),
+                    pl.col("sign").alias("sign"),
+                    pl.col("value").alias("amount"),
+                ]
+            )
         )
     combined = pl.concat(frames)
-    tmp = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
-    combined.write_parquet(tmp.name)
-    tmp.close()
+    with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+        combined.write_parquet(tmp.name)
     return tmp.name
 
 
@@ -105,6 +105,6 @@ class TestSegmentationAgentSmoke:
         from src.agents.segment.graph import run_segmentation_agent
 
         final = run_segmentation_agent(customer_parquet, max_cycles=1, verbose=False)
-        for cid, info in final["result"]["segment_names"].items():
+        for _cid, info in final["result"]["segment_names"].items():
             assert isinstance(info["label"], str)
             assert len(info["label"]) > 0

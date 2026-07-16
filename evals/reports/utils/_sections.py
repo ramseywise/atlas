@@ -54,31 +54,39 @@ def _summary_header(stats: dict) -> str:
         f'<span class="chip unrated">Unrated {s["n_unrated"]}</span>'
     )
     ratio_label = (
-        f"{dlr:.1f}:1" if dlr is not None
-        else ("all disliked" if s["n_disliked"] > 0 else "—")
+        f"{dlr:.1f}:1" if dlr is not None else ("all disliked" if s["n_disliked"] > 0 else "—")
     )
 
     quick_parts = []
     if n_unique_convs is not None:
-        quick_parts.append(f'<span><span style="color:#666">Unique convs</span> <b>{n_unique_convs:,}</b></span>')
+        quick_parts.append(
+            f'<span><span style="color:#666">Unique convs</span> <b>{n_unique_convs:,}</b></span>'
+        )
     if n_unique_users:
-        quick_parts.append(f'<span><span style="color:#666">Unique users</span> <b>{n_unique_users:,}</b></span>')
-    quick_parts.append(f'<span><span style="color:#666">Has sources</span> <b>{has_src:.1%}</b> of turns</span>')
-    quick_parts.append(f'<span><span style="color:#666">Rated</span> <b>{cov:.1%}</b> of turns</span>')
+        quick_parts.append(
+            f'<span><span style="color:#666">Unique users</span> <b>{n_unique_users:,}</b></span>'
+        )
+    quick_parts.append(
+        f'<span><span style="color:#666">Has sources</span> <b>{has_src:.1%}</b> of turns</span>'
+    )
+    quick_parts.append(
+        f'<span><span style="color:#666">Rated</span> <b>{cov:.1%}</b> of turns</span>'
+    )
 
     quick_strip = (
         '<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:8px;'
         'padding:8px 10px;background:#f5f5f5;border-radius:4px;font-size:.85em">'
-        + " &nbsp;·&nbsp; ".join(quick_parts) + "</div>"
+        + " &nbsp;·&nbsp; ".join(quick_parts)
+        + "</div>"
     )
     return (
-        f'<b>n={stats["n_total"]:,} turns</b> &nbsp; {chips}'
+        f"<b>n={stats['n_total']:,} turns</b> &nbsp; {chips}"
         f'<br/><span style="font-size:.85em;display:inline-flex;align-items:center;'
         f'gap:8px;margin-top:6px">'
         f'<span style="color:#666">Dislike:like ratio:</span>'
         f'<b style="color:#721c24">{ratio_label}</b>'
-        f'</span>'
-        f'{quick_strip}'
+        f"</span>"
+        f"{quick_strip}"
     )
 
 
@@ -142,7 +150,7 @@ def _category_block(cats: list, stats: dict) -> str:
         sparsity = (
             f"<p class='muted' style='font-size:.78em;margin:2px 0 4px'>"
             f"⚠ Only {n_categorized:,}/{stats['n_total']:,} records "
-            f"({n_categorized/stats['n_total']:.0%}) have a topic label — "
+            f"({n_categorized / stats['n_total']:.0%}) have a topic label — "
             f"dislike ratios are directional only.</p>"
         )
     return (
@@ -177,7 +185,9 @@ def retrieval_proxy_block_html(stats: dict, *, variant: str = "raw") -> str:
     if proxy_tag:
         y_note += f" · <code>{_html.escape(proxy_tag)}</code>"
 
-    return _retrieval_proxy_block_inner(rp, s, title=title, y_note=y_note, overlap=(variant == "overlap"))
+    return _retrieval_proxy_block_inner(
+        rp, s, title=title, y_note=y_note, overlap=(variant == "overlap")
+    )
 
 
 def _retrieval_proxy_block(stats: dict) -> str:
@@ -305,12 +315,12 @@ def _content_profile_block(stats: dict) -> str:
         f"<tr><td>Query length (words)</td>"
         f"<td class='num'>{qs.get('min_query_words', 0)}</td>"
         f"<td class='num'><b>{qs.get('avg_query_words', 0):.1f}</b></td>"
-        + _src_cells(qs.get('avg_query_words_sourced'), qs.get('avg_query_words_unsourced'))
+        + _src_cells(qs.get("avg_query_words_sourced"), qs.get("avg_query_words_unsourced"))
         + f"<td class='num'>{qs.get('max_query_words', 0)}</td></tr>"
         f"<tr><td>Response length (words)</td>"
         f"<td class='num'>{qs.get('min_response_words', 0)}</td>"
         f"<td class='num'><b>{qs.get('avg_response_words', 0):.1f}</b></td>"
-        + _src_cells(qs.get('avg_response_words_sourced'), qs.get('avg_response_words_unsourced'))
+        + _src_cells(qs.get("avg_response_words_sourced"), qs.get("avg_response_words_unsourced"))
         + f"<td class='num'>{qs.get('max_response_words', 0)}</td></tr>"
     )
     if ts.get("avg_turn_count") is not None:
@@ -318,7 +328,9 @@ def _content_profile_block(stats: dict) -> str:
             f"<tr><td>Conv turns</td>"
             f"<td class='num'>{ts.get('min_turn_count', 0)}</td>"
             f"<td class='num'><b>{ts['avg_turn_count']:.1f}</b></td>"
-            + _src_cells(ts.get('avg_turn_count_sourced_conv'), ts.get('avg_turn_count_unsourced_conv'))
+            + _src_cells(
+                ts.get("avg_turn_count_sourced_conv"), ts.get("avg_turn_count_unsourced_conv")
+            )
             + f"<td class='num'>{ts.get('max_turn_count', 0)}</td></tr>"
         )
     if ts.get("avg_duration_sec") is not None:
@@ -327,8 +339,12 @@ def _content_profile_block(stats: dict) -> str:
             f"<td class='num'>{ts.get('min_duration_sec', 0) / 60:.1f}</td>"
             f"<td class='num'><b>{ts['avg_duration_sec'] / 60:.1f}</b></td>"
             + _src_cells(
-                ts['avg_duration_sec_sourced_conv'] / 60 if ts.get('avg_duration_sec_sourced_conv') is not None else None,
-                ts['avg_duration_sec_unsourced_conv'] / 60 if ts.get('avg_duration_sec_unsourced_conv') is not None else None,
+                ts["avg_duration_sec_sourced_conv"] / 60
+                if ts.get("avg_duration_sec_sourced_conv") is not None
+                else None,
+                ts["avg_duration_sec_unsourced_conv"] / 60
+                if ts.get("avg_duration_sec_unsourced_conv") is not None
+                else None,
             )
             + f"<td class='num'>{ts.get('max_duration_sec', 0) / 60:.1f}</td></tr>"
         )
@@ -337,7 +353,11 @@ def _content_profile_block(stats: dict) -> str:
             f"<tr><td>Turn interval (s)</td>"
             f"<td class='num'>{ts.get('min_turn_interval_sec', 0):.0f}</td>"
             f"<td class='num'><b>{ts['avg_turn_interval_sec']:.0f}</b></td>"
-            + _src_cells(ts.get('avg_turn_interval_sec_sourced_conv'), ts.get('avg_turn_interval_sec_unsourced_conv'), fmt="{:.0f}")
+            + _src_cells(
+                ts.get("avg_turn_interval_sec_sourced_conv"),
+                ts.get("avg_turn_interval_sec_unsourced_conv"),
+                fmt="{:.0f}",
+            )
             + f"<td class='num'>{ts.get('max_turn_interval_sec', 0):.0f}</td></tr>"
         )
     if qs.get("max_source_count") is not None:
@@ -354,7 +374,11 @@ def _content_profile_block(stats: dict) -> str:
     mhs = qs.get("mean_has_source_liked")
     mhs_note = f" &nbsp;·&nbsp; sourced when liked: <b>{mhs:.0%}</b>" if mhs is not None else ""
     avg_src_liked = rp.get("avg_sources_liked")
-    avg_src_liked_note = f" &nbsp;·&nbsp; avg src/liked: <b>{avg_src_liked:.2f}</b>" if avg_src_liked is not None else ""
+    avg_src_liked_note = (
+        f" &nbsp;·&nbsp; avg src/liked: <b>{avg_src_liked:.2f}</b>"
+        if avg_src_liked is not None
+        else ""
+    )
     footnotes = ""
     if qs.get("avg_response_chars"):
         footnotes += (
@@ -371,7 +395,9 @@ def _content_profile_block(stats: dict) -> str:
     if dist:
         bucket_order = ["1", "2–3", "4–6", "7+"]
         dist_str = " &nbsp; ".join(f"<b>{k}</b>: {dist[k]}" for k in bucket_order if k in dist)
-        footnotes += f"<p class='muted' style='margin:2px 0 0;font-size:.85em'>Turn dist: {dist_str}</p>"
+        footnotes += (
+            f"<p class='muted' style='margin:2px 0 0;font-size:.85em'>Turn dist: {dist_str}</p>"
+        )
 
     return (
         "<h3>Content &amp; turn profile</h3>"
@@ -410,8 +436,12 @@ def _population_block(stats: dict) -> str:
             )
         ml_header = "<th>Multilingual</th>" if has_ml_col else ""
         cov_note = (
-            f"<p class='muted' style='margin:4px 0 0'>Rating coverage: <b>{cov:.1%}</b> of turns rated</p>"
-        ) if cov > 0 else ""
+            (
+                f"<p class='muted' style='margin:4px 0 0'>Rating coverage: <b>{cov:.1%}</b> of turns rated</p>"
+            )
+            if cov > 0
+            else ""
+        )
         ml_legend = ""
         if has_ml_col:
             ml_legend = (
@@ -446,13 +476,17 @@ def _population_block(stats: dict) -> str:
 
             def _sc(n: int) -> str:
                 return (
-                    f"<td class='num muted'>{n:,}</td>" if n
+                    f"<td class='num muted'>{n:,}</td>"
+                    if n
                     else "<td class='num muted' style='color:#ccc'>—</td>"
                 )
+
             co_rows += (
                 f"<tr><td>{outcome}</td><td class='num'>{cnt:,}</td>"
                 f"<td class='num'>{cnt / co_total:.0%}</td>"
-                + _sc(n_liked) + _sc(n_disliked) + _sc(n_unrated)
+                + _sc(n_liked)
+                + _sc(n_disliked)
+                + _sc(n_unrated)
                 + f"<td>{_pct_bar(cnt / co_total, 60, '#8ab4f8')}</td></tr>"
             )
         notes = ""
@@ -507,7 +541,8 @@ def _qa_pairs_block(qa_samples: dict[str, list[dict]], ft_order: list[str]) -> s
             ft = pair.get("ft", "")
             ft_badge = (
                 f' <span class="chip" style="background:#f0f0f0;color:#666;font-size:.7em">{ft}</span>'
-                if ft and ft not in ("no_failure", "n/a") else ""
+                if ft and ft not in ("no_failure", "n/a")
+                else ""
             )
             q = _html.escape(pair["query"][:220])
             r = _html.escape(pair["response"][:350])
@@ -518,9 +553,7 @@ def _qa_pairs_block(qa_samples: dict[str, list[dict]], ft_order: list[str]) -> s
                     f'<a href="{eu}" target="_blank" '
                     f'style="color:#2563eb;font-size:.8em;margin-right:8px">{eu[:80]}</a>'
                 )
-            sources_block = (
-                f'<div style="margin-top:4px">{url_links}</div>' if url_links else ""
-            )
+            sources_block = f'<div style="margin-top:4px">{url_links}</div>' if url_links else ""
             cards += (
                 f'<div class="qa-card">'
                 f'<div class="qa-label"><span class="chip {pair["sentiment"]}">{pair["sentiment"]}</span>{ft_badge}</div>'
@@ -530,10 +563,14 @@ def _qa_pairs_block(qa_samples: dict[str, list[dict]], ft_order: list[str]) -> s
                 f"</div>"
             )
     return (
-        '<div style="margin-top:20px;border-top:1px solid #e0e0e0;padding-top:16px">'
-        "<h3>Sample QA pairs</h3>"
-        f"{cards}</div>"
-    ) if cards else ""
+        (
+            '<div style="margin-top:20px;border-top:1px solid #e0e0e0;padding-top:16px">'
+            "<h3>Sample QA pairs</h3>"
+            f"{cards}</div>"
+        )
+        if cards
+        else ""
+    )
 
 
 def _url_coverage_section(cov: dict) -> str:
@@ -577,7 +614,7 @@ def _url_coverage_section(cov: dict) -> str:
             "border-radius:4px;padding:8px 12px;margin:8px 0;font-size:.85em'>"
             f"<b>⚠ URL domain mismatch:</b> KB articles are on <code>{_html.escape(kb_str)}</code> "
             f"— agent citations are on <code>{_html.escape(cited_str)}</code>. "
-            "These are the same articles on different domains (e.g. help.shine.co ↔ billy.dk/support). "
+            "These are the same articles on different domains (live help-center ↔ legacy KB). "
             "Coverage matching uses article IDs extracted from URLs — 0% coverage is an artifact "
             "if the ID pattern differs between domains, not a real KB gap."
             "</div>"

@@ -2,21 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import date
-
 import numpy as np
 import polars as pl
 import pytest
 
 from core.preprocessing.synthetic import (
-    PipelineSource,
     generate_ml_dataset,
     generate_sequence_dataset,
     temporal_split,
     walk_forward_cv,
 )
-from src.agents.state import CategoryType
-
 
 # ── Sequence dataset ──────────────────────────────────────────────────────────
 

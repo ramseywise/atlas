@@ -25,12 +25,16 @@ from evals.reports.utils.embed import read_svg as _read_svg_by_name
 from evals.reports.utils.theme import REPORT_THEME_CSS
 
 if TYPE_CHECKING:
-    from src.agents.state import EvalReport, ForecastResult  # noqa: F401
-    from core.segmentation.evaluation import SegmentEvalReport  # type: ignore[import-untyped]  # noqa: F401
+    from core.segmentation.evaluation import (
+        SegmentEvalReport,  # type: ignore[import-untyped]
+    )
+    from src.agents.state import EvalReport, ForecastResult
 
 OUTPUT_ROOT = Path("evals/reports/output")
 
-_CSS = REPORT_THEME_CSS + """
+_CSS = (
+    REPORT_THEME_CSS
+    + """
 .badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
 .pass{background:#d1fae5;color:var(--green);}
 .fail{background:#fee2e2;color:var(--red);}
@@ -42,6 +46,7 @@ _CSS = REPORT_THEME_CSS + """
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
 .ts{font-size:11px;color:var(--mid);margin-top:24px;}
 """
+)
 
 
 def _read_svg(path: Path) -> str:
@@ -92,8 +97,8 @@ def build_eval_report(
 ) -> Path:
     """HTML eval report: grader pass rates + forecast grid + summary stats."""
     from evals.reports.figures import (
-        fig_grader_pass_rates,
         fig_forecast_grid,
+        fig_grader_pass_rates,
     )
 
     subdir = f"eval/{report.cycle_id}"
@@ -108,18 +113,17 @@ def build_eval_report(
     status = "PASS" if report.all_passed else "FAIL"
     badge_cls = "pass" if report.all_passed else "fail"
     n_series = len(report.series_scores)
-    n_passed = sum(
-        1 for scores in report.series_scores.values()
-        if all(s.passed for s in scores)
-    )
+    n_passed = sum(1 for scores in report.series_scores.values() if all(s.passed for s in scores))
 
-    stats_row = "".join([
-        _stat(f"{report.overall_mase:.3f}", "MASE", "< 1.0 to pass"),
-        _stat(f"{report.overall_smape:.1f}%", "SMAPE", "< 15% to pass"),
-        _stat(f"{report.directional_accuracy:.1f}%", "Directional", "> 55% to pass"),
-        _stat(f"{report.coverage_80:.1f}%", "80% PI Coverage", "≥ 75% to pass"),
-        _stat(f"{report.drift_ratio:.3f}", "Drift ratio", "< 1.2 warning"),
-    ])
+    stats_row = "".join(
+        [
+            _stat(f"{report.overall_mase:.3f}", "MASE", "< 1.0 to pass"),
+            _stat(f"{report.overall_smape:.1f}%", "SMAPE", "< 15% to pass"),
+            _stat(f"{report.directional_accuracy:.1f}%", "Directional", "> 55% to pass"),
+            _stat(f"{report.coverage_80:.1f}%", "80% PI Coverage", "≥ 75% to pass"),
+            _stat(f"{report.drift_ratio:.3f}", "Drift ratio", "< 1.2 warning"),
+        ]
+    )
 
     forecast_section = ""
     if forecast_svg:
@@ -162,8 +166,8 @@ def build_segment_report(
     """HTML segmentation report: scatter + eval metrics + cluster sizes."""
     from evals.reports.figures import (
         fig_segment_eval,
-        fig_segments_scatter,
         fig_segment_sizes_bar,
+        fig_segments_scatter,
     )
 
     run_id = f"{seg_eval.algorithm.lower()}_k{seg_eval.n_clusters}"
@@ -173,30 +177,39 @@ def build_segment_report(
 
     eval_svg = fig_segment_eval(seg_eval, subdir=subdir)
     sizes_svg = fig_segment_sizes_bar(
-        seg_eval.cluster_sizes, segment_names, subdir=subdir,
+        seg_eval.cluster_sizes,
+        segment_names,
+        subdir=subdir,
     )
     scatter_svg = None
     if X_2d is not None and labels is not None:
         scatter_svg = fig_segments_scatter(
-            X_2d, labels, segment_names, subdir=subdir,
+            X_2d,
+            labels,
+            segment_names,
+            subdir=subdir,
         )
 
     status = "PASS" if seg_eval.passed else "FAIL"
     badge_cls = "pass" if seg_eval.passed else "fail"
     n_customers = sum(seg_eval.cluster_sizes.values())
 
-    stats_row = "".join([
-        _stat(str(seg_eval.n_clusters), "Clusters"),
-        _stat(str(n_customers), "Customers", f"{seg_eval.n_noise} noise"),
-        _stat(
-            f"{seg_eval.silhouette:.3f}" if not np.isnan(seg_eval.silhouette) else "—",
-            "Silhouette", "≥ 0.25 to pass",
-        ),
-        _stat(
-            f"{seg_eval.davies_bouldin:.3f}" if not np.isnan(seg_eval.davies_bouldin) else "—",
-            "Davies-Bouldin", "≤ 1.5 to pass",
-        ),
-    ])
+    stats_row = "".join(
+        [
+            _stat(str(seg_eval.n_clusters), "Clusters"),
+            _stat(str(n_customers), "Customers", f"{seg_eval.n_noise} noise"),
+            _stat(
+                f"{seg_eval.silhouette:.3f}" if not np.isnan(seg_eval.silhouette) else "—",
+                "Silhouette",
+                "≥ 0.25 to pass",
+            ),
+            _stat(
+                f"{seg_eval.davies_bouldin:.3f}" if not np.isnan(seg_eval.davies_bouldin) else "—",
+                "Davies-Bouldin",
+                "≤ 1.5 to pass",
+            ),
+        ]
+    )
 
     scatter_section = ""
     if scatter_svg:

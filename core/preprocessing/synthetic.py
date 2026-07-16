@@ -32,10 +32,9 @@ Temporal split rules (no leakage):
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, timedelta
 from enum import Enum
-from typing import Literal
 
 import numpy as np
 import polars as pl
@@ -48,6 +47,7 @@ RANDOM_SEED = 42
 
 class PipelineSource(str, Enum):
     """Real-world data pipeline sources that contribute to company cash flow."""
+
     ERP_REVENUE = "erp_revenue"
     ERP_COGS = "erp_cogs"
     PAYROLL = "payroll"
@@ -57,10 +57,10 @@ class PipelineSource(str, Enum):
     BANK_RESERVE = "bank_reserve"
     SUBSCRIPTION_BILLING = "sub_billing"
     TAX_PROVISION = "tax_provision"
-    EQUITY_FUNDING = "equity_funding"       # investor capital tranches
+    EQUITY_FUNDING = "equity_funding"  # investor capital tranches
     INVENTORY_PURCHASE = "inventory_purch"  # stock/raw-material buying
-    SALES_COMMISSION = "sales_commission"   # outbound sales spend
-    MARKETPLACE_GMV = "marketplace_gmv"     # gross transaction volume (inflow)
+    SALES_COMMISSION = "sales_commission"  # outbound sales spend
+    MARKETPLACE_GMV = "marketplace_gmv"  # gross transaction volume (inflow)
     MARKETPLACE_PAYOUT = "marketplace_payout"  # seller payouts (outflow)
 
 
@@ -78,10 +78,10 @@ class SeriesConfig:
     source: PipelineSource
     sign: CashFlowSign
     base_amount: float
-    trend_rate: float       # additive daily trend (positive = growing)
-    weekly_amp: float       # weekly seasonal amplitude
-    monthly_amp: float      # monthly (30.44d) seasonal amplitude
-    annual_amp: float       # annual (365.25d) seasonal amplitude
+    trend_rate: float  # additive daily trend (positive = growing)
+    weekly_amp: float  # weekly seasonal amplitude
+    monthly_amp: float  # monthly (30.44d) seasonal amplitude
+    annual_amp: float  # annual (365.25d) seasonal amplitude
     noise_std: float
     anomaly_prob: float = 0.05
     anomaly_multiplier: float = 3.0
@@ -104,18 +104,18 @@ class CustomerArchetype:
     noise_scale: per-instance jitter applied to base_amounts (0.2 = ±20% variation
                  within archetype, preserving inter-archetype differences).
     """
+
     name: str
-    label: str          # human-readable segment name for the rule-based namer
-    description: str    # one-sentence description
+    label: str  # human-readable segment name for the rule-based namer
+    description: str  # one-sentence description
     series: list[SeriesConfig]
     weight: float = 1.0
-    noise_scale: float = 0.15   # instance-level variation within archetype
+    noise_scale: float = 0.15  # instance-level variation within archetype
 
 
 # ── Archetype definitions ──────────────────────────────────────────────────────
 
 ARCHETYPES: list[CustomerArchetype] = [
-
     # ── 1. Early-stage founder ─────────────────────────────────────────────────
     # Pre-product-market-fit. Revenue near zero. Lives on equity tranches (lumpy).
     # Burn is high relative to income. No AR pipeline yet.
@@ -127,44 +127,68 @@ ARCHETYPES: list[CustomerArchetype] = [
         noise_scale=0.25,
         series=[
             SeriesConfig(
-                name="equity_funding", source=PipelineSource.EQUITY_FUNDING,
+                name="equity_funding",
+                source=PipelineSource.EQUITY_FUNDING,
                 sign=CashFlowSign.INFLOW,
-                base_amount=0.0, trend_rate=0.0,
-                weekly_amp=0.0, monthly_amp=0.0, annual_amp=0.0,
+                base_amount=0.0,
+                trend_rate=0.0,
+                weekly_amp=0.0,
+                monthly_amp=0.0,
+                annual_amp=0.0,
                 noise_std=500.0,
-                anomaly_prob=0.015, anomaly_multiplier=80.0,  # rare large tranches
+                anomaly_prob=0.015,
+                anomaly_multiplier=80.0,  # rare large tranches
             ),
             SeriesConfig(
-                name="sub_billing", source=PipelineSource.SUBSCRIPTION_BILLING,
+                name="sub_billing",
+                source=PipelineSource.SUBSCRIPTION_BILLING,
                 sign=CashFlowSign.INFLOW,
-                base_amount=300.0, trend_rate=4.0,
-                weekly_amp=0.0, monthly_amp=80.0, annual_amp=100.0,
-                noise_std=120.0, anomaly_prob=0.02,
+                base_amount=300.0,
+                trend_rate=4.0,
+                weekly_amp=0.0,
+                monthly_amp=80.0,
+                annual_amp=100.0,
+                noise_std=120.0,
+                anomaly_prob=0.02,
             ),
             SeriesConfig(
-                name="payroll", source=PipelineSource.PAYROLL,
+                name="payroll",
+                source=PipelineSource.PAYROLL,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=4_500.0, trend_rate=8.0,  # headcount growing fast
-                weekly_amp=0.0, monthly_amp=500.0, annual_amp=800.0,
-                noise_std=200.0, anomaly_prob=0.01,
+                base_amount=4_500.0,
+                trend_rate=8.0,  # headcount growing fast
+                weekly_amp=0.0,
+                monthly_amp=500.0,
+                annual_amp=800.0,
+                noise_std=200.0,
+                anomaly_prob=0.01,
             ),
             SeriesConfig(
-                name="accounts_payable", source=PipelineSource.AP,
+                name="accounts_payable",
+                source=PipelineSource.AP,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=1_200.0, trend_rate=3.0,
-                weekly_amp=100.0, monthly_amp=300.0, annual_amp=0.0,
-                noise_std=400.0, anomaly_prob=0.04,
+                base_amount=1_200.0,
+                trend_rate=3.0,
+                weekly_amp=100.0,
+                monthly_amp=300.0,
+                annual_amp=0.0,
+                noise_std=400.0,
+                anomaly_prob=0.04,
             ),
             SeriesConfig(
-                name="bank_operating", source=PipelineSource.BANK_OPERATING,
+                name="bank_operating",
+                source=PipelineSource.BANK_OPERATING,
                 sign=CashFlowSign.INFLOW,
-                base_amount=200.0, trend_rate=1.0,
-                weekly_amp=50.0, monthly_amp=100.0, annual_amp=0.0,
-                noise_std=150.0, anomaly_prob=0.03,
+                base_amount=200.0,
+                trend_rate=1.0,
+                weekly_amp=50.0,
+                monthly_amp=100.0,
+                annual_amp=0.0,
+                noise_std=150.0,
+                anomaly_prob=0.03,
             ),
         ],
     ),
-
     # ── 2. SMB services ────────────────────────────────────────────────────────
     # 10–50 person professional services firm. Steady project revenue (~$2M ARR).
     # Payroll is the dominant cost. Net-30 invoicing. Some quarterly seasonality.
@@ -176,44 +200,71 @@ ARCHETYPES: list[CustomerArchetype] = [
         noise_scale=0.12,
         series=[
             SeriesConfig(
-                name="erp_revenue", source=PipelineSource.ERP_REVENUE,
+                name="erp_revenue",
+                source=PipelineSource.ERP_REVENUE,
                 sign=CashFlowSign.INFLOW,
-                base_amount=5_500.0, trend_rate=3.0,
-                weekly_amp=0.0, monthly_amp=1_200.0, annual_amp=2_000.0,
-                noise_std=800.0, anomaly_prob=0.04, anomaly_multiplier=3.0,
+                base_amount=5_500.0,
+                trend_rate=3.0,
+                weekly_amp=0.0,
+                monthly_amp=1_200.0,
+                annual_amp=2_000.0,
+                noise_std=800.0,
+                anomaly_prob=0.04,
+                anomaly_multiplier=3.0,
             ),
             SeriesConfig(
-                name="accounts_receivable", source=PipelineSource.AR,
+                name="accounts_receivable",
+                source=PipelineSource.AR,
                 sign=CashFlowSign.INFLOW,
-                base_amount=4_000.0, trend_rate=2.0,
-                weekly_amp=800.0, monthly_amp=2_500.0, annual_amp=1_500.0,
-                noise_std=1_500.0, anomaly_prob=0.06, anomaly_multiplier=4.0,
+                base_amount=4_000.0,
+                trend_rate=2.0,
+                weekly_amp=800.0,
+                monthly_amp=2_500.0,
+                annual_amp=1_500.0,
+                noise_std=1_500.0,
+                anomaly_prob=0.06,
+                anomaly_multiplier=4.0,
                 monthly_phase=0.3,
             ),
             SeriesConfig(
-                name="payroll", source=PipelineSource.PAYROLL,
+                name="payroll",
+                source=PipelineSource.PAYROLL,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=6_000.0, trend_rate=1.5,
-                weekly_amp=0.0, monthly_amp=600.0, annual_amp=1_200.0,
-                noise_std=200.0, anomaly_prob=0.01,
+                base_amount=6_000.0,
+                trend_rate=1.5,
+                weekly_amp=0.0,
+                monthly_amp=600.0,
+                annual_amp=1_200.0,
+                noise_std=200.0,
+                anomaly_prob=0.01,
             ),
             SeriesConfig(
-                name="accounts_payable", source=PipelineSource.AP,
+                name="accounts_payable",
+                source=PipelineSource.AP,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=1_500.0, trend_rate=0.5,
-                weekly_amp=200.0, monthly_amp=400.0, annual_amp=500.0,
-                noise_std=400.0, anomaly_prob=0.03,
+                base_amount=1_500.0,
+                trend_rate=0.5,
+                weekly_amp=200.0,
+                monthly_amp=400.0,
+                annual_amp=500.0,
+                noise_std=400.0,
+                anomaly_prob=0.03,
             ),
             SeriesConfig(
-                name="tax_provision", source=PipelineSource.TAX_PROVISION,
+                name="tax_provision",
+                source=PipelineSource.TAX_PROVISION,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=600.0, trend_rate=0.2,
-                weekly_amp=0.0, monthly_amp=0.0, annual_amp=2_000.0,
-                noise_std=100.0, anomaly_prob=0.01, anomaly_multiplier=4.0,
+                base_amount=600.0,
+                trend_rate=0.2,
+                weekly_amp=0.0,
+                monthly_amp=0.0,
+                annual_amp=2_000.0,
+                noise_std=100.0,
+                anomaly_prob=0.01,
+                anomaly_multiplier=4.0,
             ),
         ],
     ),
-
     # ── 3. SaaS growth ────────────────────────────────────────────────────────
     # $5–15M ARR, MRR growing ~5%/mo. Low COGS. Sales and marketing is the main
     # outflow. Annual contract spikes in Q4.
@@ -225,44 +276,72 @@ ARCHETYPES: list[CustomerArchetype] = [
         noise_scale=0.10,
         series=[
             SeriesConfig(
-                name="sub_billing", source=PipelineSource.SUBSCRIPTION_BILLING,
+                name="sub_billing",
+                source=PipelineSource.SUBSCRIPTION_BILLING,
                 sign=CashFlowSign.INFLOW,
-                base_amount=18_000.0, trend_rate=18.0,  # fast MRR growth
-                weekly_amp=0.0, monthly_amp=2_000.0, annual_amp=8_000.0,
-                noise_std=600.0, anomaly_prob=0.02, anomaly_multiplier=3.0,
+                base_amount=18_000.0,
+                trend_rate=18.0,  # fast MRR growth
+                weekly_amp=0.0,
+                monthly_amp=2_000.0,
+                annual_amp=8_000.0,
+                noise_std=600.0,
+                anomaly_prob=0.02,
+                anomaly_multiplier=3.0,
                 annual_phase=0.1,  # Q4-skewed
             ),
             SeriesConfig(
-                name="erp_revenue", source=PipelineSource.ERP_REVENUE,
+                name="erp_revenue",
+                source=PipelineSource.ERP_REVENUE,
                 sign=CashFlowSign.INFLOW,
-                base_amount=8_000.0, trend_rate=8.0,
-                weekly_amp=0.0, monthly_amp=1_500.0, annual_amp=5_000.0,
-                noise_std=1_000.0, anomaly_prob=0.03, anomaly_multiplier=4.0,
+                base_amount=8_000.0,
+                trend_rate=8.0,
+                weekly_amp=0.0,
+                monthly_amp=1_500.0,
+                annual_amp=5_000.0,
+                noise_std=1_000.0,
+                anomaly_prob=0.03,
+                anomaly_multiplier=4.0,
             ),
             SeriesConfig(
-                name="payroll", source=PipelineSource.PAYROLL,
+                name="payroll",
+                source=PipelineSource.PAYROLL,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=12_000.0, trend_rate=15.0,  # heavy hiring
-                weekly_amp=0.0, monthly_amp=1_200.0, annual_amp=3_000.0,
-                noise_std=400.0, anomaly_prob=0.01,
+                base_amount=12_000.0,
+                trend_rate=15.0,  # heavy hiring
+                weekly_amp=0.0,
+                monthly_amp=1_200.0,
+                annual_amp=3_000.0,
+                noise_std=400.0,
+                anomaly_prob=0.01,
             ),
             SeriesConfig(
-                name="sales_commission", source=PipelineSource.SALES_COMMISSION,
+                name="sales_commission",
+                source=PipelineSource.SALES_COMMISSION,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=4_000.0, trend_rate=12.0,
-                weekly_amp=0.0, monthly_amp=800.0, annual_amp=4_000.0,
-                noise_std=1_200.0, anomaly_prob=0.05, anomaly_multiplier=3.5,
+                base_amount=4_000.0,
+                trend_rate=12.0,
+                weekly_amp=0.0,
+                monthly_amp=800.0,
+                annual_amp=4_000.0,
+                noise_std=1_200.0,
+                anomaly_prob=0.05,
+                anomaly_multiplier=3.5,
             ),
             SeriesConfig(
-                name="tax_provision", source=PipelineSource.TAX_PROVISION,
+                name="tax_provision",
+                source=PipelineSource.TAX_PROVISION,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=1_800.0, trend_rate=1.5,
-                weekly_amp=0.0, monthly_amp=0.0, annual_amp=5_000.0,
-                noise_std=200.0, anomaly_prob=0.01, anomaly_multiplier=4.0,
+                base_amount=1_800.0,
+                trend_rate=1.5,
+                weekly_amp=0.0,
+                monthly_amp=0.0,
+                annual_amp=5_000.0,
+                noise_std=200.0,
+                anomaly_prob=0.01,
+                anomaly_multiplier=4.0,
             ),
         ],
     ),
-
     # ── 4. Manufacturing / commodity ──────────────────────────────────────────
     # Capital-intensive. Large irregular AR (enterprise buyers, net-60).
     # Big inventory purchase spikes. Thin margins. Seasonal demand.
@@ -274,52 +353,83 @@ ARCHETYPES: list[CustomerArchetype] = [
         noise_scale=0.20,
         series=[
             SeriesConfig(
-                name="accounts_receivable", source=PipelineSource.AR,
+                name="accounts_receivable",
+                source=PipelineSource.AR,
                 sign=CashFlowSign.INFLOW,
-                base_amount=22_000.0, trend_rate=2.0,
-                weekly_amp=2_000.0, monthly_amp=8_000.0, annual_amp=12_000.0,
-                noise_std=6_000.0, anomaly_prob=0.08, anomaly_multiplier=5.0,
+                base_amount=22_000.0,
+                trend_rate=2.0,
+                weekly_amp=2_000.0,
+                monthly_amp=8_000.0,
+                annual_amp=12_000.0,
+                noise_std=6_000.0,
+                anomaly_prob=0.08,
+                anomaly_multiplier=5.0,
                 monthly_phase=0.5,  # collections cluster mid-month
             ),
             SeriesConfig(
-                name="erp_revenue", source=PipelineSource.ERP_REVENUE,
+                name="erp_revenue",
+                source=PipelineSource.ERP_REVENUE,
                 sign=CashFlowSign.INFLOW,
-                base_amount=15_000.0, trend_rate=1.0,
-                weekly_amp=500.0, monthly_amp=3_000.0, annual_amp=10_000.0,
-                noise_std=3_000.0, anomaly_prob=0.04,
+                base_amount=15_000.0,
+                trend_rate=1.0,
+                weekly_amp=500.0,
+                monthly_amp=3_000.0,
+                annual_amp=10_000.0,
+                noise_std=3_000.0,
+                anomaly_prob=0.04,
             ),
             SeriesConfig(
-                name="inventory_purch", source=PipelineSource.INVENTORY_PURCHASE,
+                name="inventory_purch",
+                source=PipelineSource.INVENTORY_PURCHASE,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=12_000.0, trend_rate=1.0,
-                weekly_amp=1_000.0, monthly_amp=5_000.0, annual_amp=8_000.0,
-                noise_std=4_000.0, anomaly_prob=0.07, anomaly_multiplier=4.0,
+                base_amount=12_000.0,
+                trend_rate=1.0,
+                weekly_amp=1_000.0,
+                monthly_amp=5_000.0,
+                annual_amp=8_000.0,
+                noise_std=4_000.0,
+                anomaly_prob=0.07,
+                anomaly_multiplier=4.0,
                 monthly_phase=0.1,
             ),
             SeriesConfig(
-                name="accounts_payable", source=PipelineSource.AP,
+                name="accounts_payable",
+                source=PipelineSource.AP,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=8_000.0, trend_rate=0.5,
-                weekly_amp=800.0, monthly_amp=3_000.0, annual_amp=4_000.0,
-                noise_std=2_000.0, anomaly_prob=0.05,
+                base_amount=8_000.0,
+                trend_rate=0.5,
+                weekly_amp=800.0,
+                monthly_amp=3_000.0,
+                annual_amp=4_000.0,
+                noise_std=2_000.0,
+                anomaly_prob=0.05,
             ),
             SeriesConfig(
-                name="payroll", source=PipelineSource.PAYROLL,
+                name="payroll",
+                source=PipelineSource.PAYROLL,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=9_000.0, trend_rate=0.5,
-                weekly_amp=0.0, monthly_amp=900.0, annual_amp=1_500.0,
-                noise_std=300.0, anomaly_prob=0.01,
+                base_amount=9_000.0,
+                trend_rate=0.5,
+                weekly_amp=0.0,
+                monthly_amp=900.0,
+                annual_amp=1_500.0,
+                noise_std=300.0,
+                anomaly_prob=0.01,
             ),
             SeriesConfig(
-                name="tax_provision", source=PipelineSource.TAX_PROVISION,
+                name="tax_provision",
+                source=PipelineSource.TAX_PROVISION,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=1_200.0, trend_rate=0.1,
-                weekly_amp=0.0, monthly_amp=0.0, annual_amp=5_000.0,
-                noise_std=200.0, anomaly_prob=0.01,
+                base_amount=1_200.0,
+                trend_rate=0.1,
+                weekly_amp=0.0,
+                monthly_amp=0.0,
+                annual_amp=5_000.0,
+                noise_std=200.0,
+                anomaly_prob=0.01,
             ),
         ],
     ),
-
     # ── 5. Retail / seasonal ──────────────────────────────────────────────────
     # Consumer retail. Q4 is 40% of annual revenue. Tight margins. Constant
     # supplier AP. Bank operating is primary cash visibility.
@@ -331,46 +441,71 @@ ARCHETYPES: list[CustomerArchetype] = [
         noise_scale=0.18,
         series=[
             SeriesConfig(
-                name="erp_revenue", source=PipelineSource.ERP_REVENUE,
+                name="erp_revenue",
+                source=PipelineSource.ERP_REVENUE,
                 sign=CashFlowSign.INFLOW,
-                base_amount=8_000.0, trend_rate=1.0,
-                weekly_amp=2_000.0, monthly_amp=1_000.0, annual_amp=18_000.0,
-                noise_std=2_500.0, anomaly_prob=0.04,
+                base_amount=8_000.0,
+                trend_rate=1.0,
+                weekly_amp=2_000.0,
+                monthly_amp=1_000.0,
+                annual_amp=18_000.0,
+                noise_std=2_500.0,
+                anomaly_prob=0.04,
                 annual_phase=0.25,  # peaks in Nov/Dec
             ),
             SeriesConfig(
-                name="bank_operating", source=PipelineSource.BANK_OPERATING,
+                name="bank_operating",
+                source=PipelineSource.BANK_OPERATING,
                 sign=CashFlowSign.INFLOW,
-                base_amount=3_000.0, trend_rate=0.5,
-                weekly_amp=1_500.0, monthly_amp=500.0, annual_amp=5_000.0,
-                noise_std=1_000.0, anomaly_prob=0.05,
+                base_amount=3_000.0,
+                trend_rate=0.5,
+                weekly_amp=1_500.0,
+                monthly_amp=500.0,
+                annual_amp=5_000.0,
+                noise_std=1_000.0,
+                anomaly_prob=0.05,
                 annual_phase=0.25,
             ),
             SeriesConfig(
-                name="inventory_purch", source=PipelineSource.INVENTORY_PURCHASE,
+                name="inventory_purch",
+                source=PipelineSource.INVENTORY_PURCHASE,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=5_500.0, trend_rate=0.5,
-                weekly_amp=500.0, monthly_amp=800.0, annual_amp=10_000.0,
-                noise_std=2_000.0, anomaly_prob=0.06, anomaly_multiplier=3.5,
+                base_amount=5_500.0,
+                trend_rate=0.5,
+                weekly_amp=500.0,
+                monthly_amp=800.0,
+                annual_amp=10_000.0,
+                noise_std=2_000.0,
+                anomaly_prob=0.06,
+                anomaly_multiplier=3.5,
                 annual_phase=-0.1,  # buys stock ahead of Q4
             ),
             SeriesConfig(
-                name="accounts_payable", source=PipelineSource.AP,
+                name="accounts_payable",
+                source=PipelineSource.AP,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=4_000.0, trend_rate=0.3,
-                weekly_amp=400.0, monthly_amp=600.0, annual_amp=2_000.0,
-                noise_std=800.0, anomaly_prob=0.04,
+                base_amount=4_000.0,
+                trend_rate=0.3,
+                weekly_amp=400.0,
+                monthly_amp=600.0,
+                annual_amp=2_000.0,
+                noise_std=800.0,
+                anomaly_prob=0.04,
             ),
             SeriesConfig(
-                name="payroll", source=PipelineSource.PAYROLL,
+                name="payroll",
+                source=PipelineSource.PAYROLL,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=3_500.0, trend_rate=0.2,
-                weekly_amp=0.0, monthly_amp=350.0, annual_amp=500.0,
-                noise_std=150.0, anomaly_prob=0.01,
+                base_amount=3_500.0,
+                trend_rate=0.2,
+                weekly_amp=0.0,
+                monthly_amp=350.0,
+                annual_amp=500.0,
+                noise_std=150.0,
+                anomaly_prob=0.01,
             ),
         ],
     ),
-
     # ── 6. Professional services / consulting ─────────────────────────────────
     # Milestone-based billing. High utilisation, low COGS. People costs dominate.
     # Longer payment cycles (net-45 to net-60). Low anomaly rate.
@@ -382,45 +517,71 @@ ARCHETYPES: list[CustomerArchetype] = [
         noise_scale=0.10,
         series=[
             SeriesConfig(
-                name="erp_revenue", source=PipelineSource.ERP_REVENUE,
+                name="erp_revenue",
+                source=PipelineSource.ERP_REVENUE,
                 sign=CashFlowSign.INFLOW,
-                base_amount=14_000.0, trend_rate=5.0,
-                weekly_amp=0.0, monthly_amp=4_000.0, annual_amp=3_000.0,
-                noise_std=2_500.0, anomaly_prob=0.05, anomaly_multiplier=3.0,
+                base_amount=14_000.0,
+                trend_rate=5.0,
+                weekly_amp=0.0,
+                monthly_amp=4_000.0,
+                annual_amp=3_000.0,
+                noise_std=2_500.0,
+                anomaly_prob=0.05,
+                anomaly_multiplier=3.0,
                 monthly_phase=0.6,  # milestone at end of month
             ),
             SeriesConfig(
-                name="accounts_receivable", source=PipelineSource.AR,
+                name="accounts_receivable",
+                source=PipelineSource.AR,
                 sign=CashFlowSign.INFLOW,
-                base_amount=10_000.0, trend_rate=4.0,
-                weekly_amp=500.0, monthly_amp=3_500.0, annual_amp=2_000.0,
-                noise_std=2_000.0, anomaly_prob=0.04, anomaly_multiplier=3.5,
+                base_amount=10_000.0,
+                trend_rate=4.0,
+                weekly_amp=500.0,
+                monthly_amp=3_500.0,
+                annual_amp=2_000.0,
+                noise_std=2_000.0,
+                anomaly_prob=0.04,
+                anomaly_multiplier=3.5,
                 monthly_phase=0.7,
             ),
             SeriesConfig(
-                name="payroll", source=PipelineSource.PAYROLL,
+                name="payroll",
+                source=PipelineSource.PAYROLL,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=16_000.0, trend_rate=4.0,
-                weekly_amp=0.0, monthly_amp=1_600.0, annual_amp=3_500.0,
-                noise_std=400.0, anomaly_prob=0.01,
+                base_amount=16_000.0,
+                trend_rate=4.0,
+                weekly_amp=0.0,
+                monthly_amp=1_600.0,
+                annual_amp=3_500.0,
+                noise_std=400.0,
+                anomaly_prob=0.01,
             ),
             SeriesConfig(
-                name="accounts_payable", source=PipelineSource.AP,
+                name="accounts_payable",
+                source=PipelineSource.AP,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=1_800.0, trend_rate=0.5,
-                weekly_amp=100.0, monthly_amp=300.0, annual_amp=500.0,
-                noise_std=300.0, anomaly_prob=0.02,
+                base_amount=1_800.0,
+                trend_rate=0.5,
+                weekly_amp=100.0,
+                monthly_amp=300.0,
+                annual_amp=500.0,
+                noise_std=300.0,
+                anomaly_prob=0.02,
             ),
             SeriesConfig(
-                name="tax_provision", source=PipelineSource.TAX_PROVISION,
+                name="tax_provision",
+                source=PipelineSource.TAX_PROVISION,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=1_400.0, trend_rate=0.4,
-                weekly_amp=0.0, monthly_amp=0.0, annual_amp=4_500.0,
-                noise_std=150.0, anomaly_prob=0.01,
+                base_amount=1_400.0,
+                trend_rate=0.4,
+                weekly_amp=0.0,
+                monthly_amp=0.0,
+                annual_amp=4_500.0,
+                noise_std=150.0,
+                anomaly_prob=0.01,
             ),
         ],
     ),
-
     # ── 7. Marketplace / platform ─────────────────────────────────────────────
     # Two-sided platform. High gross transaction volume, low net take-rate (~10%).
     # Payout velocity is the key risk. Strong weekend/event-driven weekly pattern.
@@ -432,34 +593,56 @@ ARCHETYPES: list[CustomerArchetype] = [
         noise_scale=0.15,
         series=[
             SeriesConfig(
-                name="marketplace_gmv", source=PipelineSource.MARKETPLACE_GMV,
+                name="marketplace_gmv",
+                source=PipelineSource.MARKETPLACE_GMV,
                 sign=CashFlowSign.INFLOW,
-                base_amount=55_000.0, trend_rate=30.0,
-                weekly_amp=15_000.0, monthly_amp=5_000.0, annual_amp=20_000.0,
-                noise_std=8_000.0, anomaly_prob=0.04, anomaly_multiplier=3.0,
+                base_amount=55_000.0,
+                trend_rate=30.0,
+                weekly_amp=15_000.0,
+                monthly_amp=5_000.0,
+                annual_amp=20_000.0,
+                noise_std=8_000.0,
+                anomaly_prob=0.04,
+                anomaly_multiplier=3.0,
                 weekly_phase=0.5,  # peaks Friday/Saturday
             ),
             SeriesConfig(
-                name="marketplace_payout", source=PipelineSource.MARKETPLACE_PAYOUT,
+                name="marketplace_payout",
+                source=PipelineSource.MARKETPLACE_PAYOUT,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=49_500.0, trend_rate=27.0,  # ~90% payout ratio
-                weekly_amp=13_000.0, monthly_amp=4_500.0, annual_amp=18_000.0,
-                noise_std=7_000.0, anomaly_prob=0.03, anomaly_multiplier=2.5,
+                base_amount=49_500.0,
+                trend_rate=27.0,  # ~90% payout ratio
+                weekly_amp=13_000.0,
+                monthly_amp=4_500.0,
+                annual_amp=18_000.0,
+                noise_std=7_000.0,
+                anomaly_prob=0.03,
+                anomaly_multiplier=2.5,
                 weekly_phase=0.6,  # payouts lag GMV by ~1 day
             ),
             SeriesConfig(
-                name="sub_billing", source=PipelineSource.SUBSCRIPTION_BILLING,
+                name="sub_billing",
+                source=PipelineSource.SUBSCRIPTION_BILLING,
                 sign=CashFlowSign.INFLOW,
-                base_amount=3_000.0, trend_rate=5.0,  # seller subscription fees
-                weekly_amp=0.0, monthly_amp=500.0, annual_amp=1_000.0,
-                noise_std=300.0, anomaly_prob=0.02,
+                base_amount=3_000.0,
+                trend_rate=5.0,  # seller subscription fees
+                weekly_amp=0.0,
+                monthly_amp=500.0,
+                annual_amp=1_000.0,
+                noise_std=300.0,
+                anomaly_prob=0.02,
             ),
             SeriesConfig(
-                name="payroll", source=PipelineSource.PAYROLL,
+                name="payroll",
+                source=PipelineSource.PAYROLL,
                 sign=CashFlowSign.OUTFLOW,
-                base_amount=5_000.0, trend_rate=8.0,
-                weekly_amp=0.0, monthly_amp=500.0, annual_amp=800.0,
-                noise_std=200.0, anomaly_prob=0.01,
+                base_amount=5_000.0,
+                trend_rate=8.0,
+                weekly_amp=0.0,
+                monthly_amp=500.0,
+                annual_amp=800.0,
+                noise_std=200.0,
+                anomaly_prob=0.01,
             ),
         ],
     ),
@@ -489,7 +672,9 @@ def _generate_raw_series(
     base = config.base_amount * amount_scale
     trend = base + config.trend_rate * amount_scale * t
     weekly = config.weekly_amp * amount_scale * np.sin(2 * np.pi * t / 7 + config.weekly_phase)
-    monthly = config.monthly_amp * amount_scale * np.sin(2 * np.pi * t / 30.44 + config.monthly_phase)
+    monthly = (
+        config.monthly_amp * amount_scale * np.sin(2 * np.pi * t / 30.44 + config.monthly_phase)
+    )
     annual = config.annual_amp * amount_scale * np.sin(2 * np.pi * t / 365.25 + config.annual_phase)
     noise_scale = config.noise_std * amount_scale * (1.0 + 0.0005 * t)
     noise = rng.normal(0.0, noise_scale)
@@ -500,14 +685,16 @@ def _generate_raw_series(
     values[anomaly_mask] *= config.anomaly_multiplier * direction[anomaly_mask]
     values = np.clip(values, 0.0, None)
 
-    return pl.DataFrame({
-        "date": dates,
-        "series_id": config.name,
-        "source": config.source.value,
-        "sign": config.sign.value,
-        "value": values.tolist(),
-        "is_anomaly": anomaly_mask.tolist(),
-    }).with_columns(pl.col("date").cast(pl.Date))
+    return pl.DataFrame(
+        {
+            "date": dates,
+            "series_id": config.name,
+            "source": config.source.value,
+            "sign": config.sign.value,
+            "value": values.tolist(),
+            "is_anomaly": anomaly_mask.tolist(),
+        }
+    ).with_columns(pl.col("date").cast(pl.Date))
 
 
 # ── Single-customer sequence dataset (Chronos / statsforecast format) ──────────
@@ -567,10 +754,12 @@ def generate_multi_customer_dataset(
     rng = np.random.default_rng(seed)
 
     archetypes = ARCHETYPES
-    weights = np.array([
-        archetype_weights.get(a.name, a.weight) if archetype_weights else a.weight
-        for a in archetypes
-    ])
+    weights = np.array(
+        [
+            archetype_weights.get(a.name, a.weight) if archetype_weights else a.weight
+            for a in archetypes
+        ]
+    )
     weights = weights / weights.sum()
 
     assigned: list[CustomerArchetype] = list(
@@ -587,10 +776,12 @@ def generate_multi_customer_dataset(
         for config in archetype.series:
             series_rng = np.random.default_rng(seed + i * 100 + hash(config.name) % 10_000)
             df = _generate_raw_series(config, start_date, n_days, series_rng, amount_scale)
-            df = df.with_columns([
-                pl.lit(customer_id).alias("customer_id"),
-                pl.lit(archetype.name).alias("archetype"),
-            ])
+            df = df.with_columns(
+                [
+                    pl.lit(customer_id).alias("customer_id"),
+                    pl.lit(archetype.name).alias("archetype"),
+                ]
+            )
             frames.append(df)
 
     return pl.concat(frames).sort(["customer_id", "series_id", "date"])
@@ -642,13 +833,9 @@ def generate_ml_dataset(
         dom = [d.day for d in dates]
         month = [d.month for d in dates]
         quarter = [(d.month - 1) // 3 + 1 for d in dates]
-        is_month_end = [
-            1 if (dates[i] + timedelta(days=1)).day == 1 else 0
-            for i in range(n)
-        ]
+        is_month_end = [1 if (dates[i] + timedelta(days=1)).day == 1 else 0 for i in range(n)]
         is_quarter_end = [
-            1 if month[i] in (3, 6, 9, 12) and is_month_end[i] else 0
-            for i in range(n)
+            1 if month[i] in (3, 6, 9, 12) and is_month_end[i] else 0 for i in range(n)
         ]
 
         target = [v[i + horizon_days] if i + horizon_days < n else float("nan") for i in range(n)]
@@ -657,26 +844,28 @@ def generate_ml_dataset(
             for k in range(1, 8)
         }
 
-        row_df = s.with_columns([
-            pl.Series("lag_1d", lags["lag_1d"]),
-            pl.Series("lag_7d", lags["lag_7d"]),
-            pl.Series("lag_14d", lags["lag_14d"]),
-            pl.Series("lag_30d", lags["lag_30d"]),
-            pl.Series("roll_mean_7d", roll_mean_7),
-            pl.Series("roll_std_7d", roll_std_7),
-            pl.Series("roll_mean_14d", roll_mean_14),
-            pl.Series("roll_mean_30d", roll_mean_30),
-            pl.Series("roll_std_30d", roll_std_30),
-            pl.Series("roll_mean_90d", roll_mean_90),
-            pl.Series("day_of_week", dow).cast(pl.Int8),
-            pl.Series("day_of_month", dom).cast(pl.Int8),
-            pl.Series("month", month).cast(pl.Int8),
-            pl.Series("quarter", quarter).cast(pl.Int8),
-            pl.Series("is_month_end", is_month_end).cast(pl.Int8),
-            pl.Series("is_quarter_end", is_quarter_end).cast(pl.Int8),
-            pl.Series(f"target_{horizon_days}d", target),
-            *[pl.Series(k, v2) for k, v2 in targets_1_7.items()],
-        ])
+        row_df = s.with_columns(
+            [
+                pl.Series("lag_1d", lags["lag_1d"]),
+                pl.Series("lag_7d", lags["lag_7d"]),
+                pl.Series("lag_14d", lags["lag_14d"]),
+                pl.Series("lag_30d", lags["lag_30d"]),
+                pl.Series("roll_mean_7d", roll_mean_7),
+                pl.Series("roll_std_7d", roll_std_7),
+                pl.Series("roll_mean_14d", roll_mean_14),
+                pl.Series("roll_mean_30d", roll_mean_30),
+                pl.Series("roll_std_30d", roll_std_30),
+                pl.Series("roll_mean_90d", roll_mean_90),
+                pl.Series("day_of_week", dow).cast(pl.Int8),
+                pl.Series("day_of_month", dom).cast(pl.Int8),
+                pl.Series("month", month).cast(pl.Int8),
+                pl.Series("quarter", quarter).cast(pl.Int8),
+                pl.Series("is_month_end", is_month_end).cast(pl.Int8),
+                pl.Series("is_quarter_end", is_quarter_end).cast(pl.Int8),
+                pl.Series(f"target_{horizon_days}d", target),
+                *[pl.Series(k, v2) for k, v2 in targets_1_7.items()],
+            ]
+        )
         frames.append(row_df)
 
     return pl.concat(frames).sort(["series_id", "date"])
@@ -705,6 +894,7 @@ class TemporalSplit:
     Strictly chronological train/val/test split.
     Test is guarded — call get_test(acknowledged=True) for final evaluation only.
     """
+
     train: pl.DataFrame
     val: pl.DataFrame
     _test: pl.DataFrame
@@ -799,15 +989,18 @@ def walk_forward_cv(
         val_end = dates[min(cursor + horizon_days - 1, n - 1)]
 
         train = sorted_df.filter(pl.col("date") <= train_end)
-        val = sorted_df.filter(
-            (pl.col("date") > train_end) & (pl.col("date") <= val_end)
-        )
+        val = sorted_df.filter((pl.col("date") > train_end) & (pl.col("date") <= val_end))
 
         if len(val) > 0:
-            folds.append(WalkForwardFold(
-                train=train, val=val,
-                fold_idx=fold_idx, train_end=train_end, val_end=val_end,
-            ))
+            folds.append(
+                WalkForwardFold(
+                    train=train,
+                    val=val,
+                    fold_idx=fold_idx,
+                    train_end=train_end,
+                    val_end=val_end,
+                )
+            )
 
         cursor += step_days
         fold_idx += 1

@@ -14,12 +14,13 @@ import json
 import math
 import os
 import uuid
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 
 import numpy as np
 import polars as pl
 
+from evals.graders.graders import EvalHarness
 from src.agents.state import (
     AgentState,
     CategoryType,
@@ -30,7 +31,6 @@ from src.agents.state import (
     ModelVariant,
     PlannerStrategy,
 )
-from evals.graders.graders import EvalHarness
 
 # ── Horizon map ───────────────────────────────────────────────────────────────
 
@@ -81,10 +81,9 @@ def _run_statsforecast_fallback(
     Returns (point_forecast, lower_80, upper_80).
     """
     try:
+        import pandas as pd
         from statsforecast import StatsForecast
         from statsforecast.models import AutoETS
-
-        import pandas as pd
 
         n = len(series_values)
         df_sf = pd.DataFrame(
@@ -139,7 +138,7 @@ def _run_chronos(
         lower = quantiles[0, :, 0].numpy().tolist()
         upper = quantiles[0, :, 2].numpy().tolist()
         return point, lower, upper
-    except Exception as e:
+    except Exception:
         # Chronos not installed or no GPU — graceful degradation
         return _run_statsforecast_fallback(series_values, horizon_days)
 
@@ -148,7 +147,6 @@ def forecaster_node(state: AgentState) -> dict[str, Any]:
     """
     Generates forecasts for each series using the strategy chosen by the Planner.
     """
-    import math
 
     strategy: PlannerStrategy = state["strategy"]
     series_data = pl.from_dict(state["series_data"])
@@ -163,9 +161,7 @@ def forecaster_node(state: AgentState) -> dict[str, Any]:
 
     for series_id in series_data["series_id"].unique().to_list():
         series_df = (
-            series_data.filter(pl.col("series_id") == series_id)
-            .sort("date")
-            .tail(context_days)
+            series_data.filter(pl.col("series_id") == series_id).sort("date").tail(context_days)
         )
         values = series_df["value"].to_numpy()
         # Derive category from sign column (synthetic data has no "category" column)
@@ -178,8 +174,8 @@ def forecaster_node(state: AgentState) -> dict[str, Any]:
             point, lower, upper = _run_statsforecast_fallback(values, horizon_days)
 
         # Clamp so lower ≤ point ≤ upper — statsforecast can produce asymmetric intervals
-        lower = [min(lo, pt) for lo, pt in zip(lower, point)]
-        upper = [max(hi, pt) for hi, pt in zip(upper, point)]
+        lower = [min(lo, pt) for lo, pt in zip(lower, point, strict=False)]
+        upper = [max(hi, pt) for hi, pt in zip(upper, point, strict=False)]
 
         forecasts.append(
             ForecastResult(
@@ -331,7 +327,7 @@ Update the strategy. Output only JSON."""
             raw = response.content[0].text.strip()
             updated_json = json.loads(raw)
             reflection_text = updated_json.get("reflection_text", "")
-        except Exception as e:
+        except Exception:
             updated_json = {}
 
     # Rule-based fallback (also used to fill gaps)
@@ -342,9 +338,7 @@ Update the strategy. Output only JSON."""
     # Build updated PlannerStrategy
     new_strategy = PlannerStrategy(
         horizon=ForecastHorizon(updated_json.get("horizon", strategy.horizon.value)),
-        model_variant=ModelVariant(
-            updated_json.get("model_variant", strategy.model_variant.value)
-        ),
+        model_variant=ModelVariant(updated_json.get("model_variant", strategy.model_variant.value)),
         context_multiplier=float(
             updated_json.get("context_multiplier", strategy.context_multiplier)
         ),
@@ -366,10 +360,7 @@ Update the strategy. Output only JSON."""
         strategy_changes=changes,
     )
 
-    terminate = (
-        cycle_count + 1 >= max_cycles
-        or (report.all_passed and cycle_count >= 2)
-    )
+    terminate = cycle_count + 1 >= max_cycles or (report.all_passed and cycle_count >= 2)
 
     return {
         "learner_feedback": feedback,
@@ -390,9 +381,7 @@ def _rule_based_strategy_update(
         ModelVariant.CHRONOS_SMALL,
     ]
     current_idx = (
-        model_ladder.index(strategy.model_variant)
-        if strategy.model_variant in model_ladder
-        else 0
+        model_ladder.index(strategy.model_variant) if strategy.model_variant in model_ladder else 0
     )
 
     new_idx = current_idx

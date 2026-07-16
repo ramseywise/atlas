@@ -21,20 +21,18 @@ Usage:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import field
 from datetime import date
 from pathlib import Path
-from typing import Literal
 
 import polars as pl
 from pydantic import BaseModel, field_validator
 
 from core.preprocessing.synthetic import (
-    PipelineSource,
     CashFlowSign,
+    PipelineSource,
     generate_sequence_dataset,
 )
-
 
 # ── Canonical record schema ────────────────────────────────────────────────────
 
@@ -44,12 +42,13 @@ class CashFlowRecord(BaseModel):
     Single normalised cash flow observation.
     All pipeline adapters produce this schema.
     """
+
     customer_id: str
     date: date
-    series_id: str                  # pipeline-scoped series name
+    series_id: str  # pipeline-scoped series name
     source: PipelineSource
     sign: CashFlowSign
-    amount: float                   # always positive; sign field carries direction
+    amount: float  # always positive; sign field carries direction
     currency: str = "USD"
     is_anomaly: bool = False
     metadata: dict = field(default_factory=dict)
@@ -93,23 +92,21 @@ def adapt_erp_export(df: pl.DataFrame, customer_id: str) -> pl.DataFrame:
     if missing:
         raise ValueError(f"ERP export missing columns: {missing}")
 
-    return (
-        df
-        .with_columns([
+    return df.with_columns(
+        [
             pl.col("transaction_date").cast(pl.Date).alias("date"),
             pl.lit(customer_id).alias("customer_id"),
             pl.col("account_code").alias("series_id"),
             pl.lit(PipelineSource.ERP_REVENUE.value).alias("source"),
             pl.when(pl.col("credit") > 0)
-              .then(pl.lit(CashFlowSign.INFLOW.value))
-              .otherwise(pl.lit(CashFlowSign.OUTFLOW.value))
-              .alias("sign"),
+            .then(pl.lit(CashFlowSign.INFLOW.value))
+            .otherwise(pl.lit(CashFlowSign.OUTFLOW.value))
+            .alias("sign"),
             (pl.col("credit") + pl.col("debit")).abs().alias("amount"),
             pl.lit("USD").alias("currency"),
             pl.lit(False).alias("is_anomaly"),
-        ])
-        .select(list(CANONICAL_SCHEMA.keys()))
-    )
+        ]
+    ).select(list(CANONICAL_SCHEMA.keys()))
 
 
 def adapt_payroll_export(df: pl.DataFrame, customer_id: str) -> pl.DataFrame:
@@ -123,9 +120,8 @@ def adapt_payroll_export(df: pl.DataFrame, customer_id: str) -> pl.DataFrame:
     if missing:
         raise ValueError(f"Payroll export missing columns: {missing}")
 
-    return (
-        df
-        .with_columns([
+    return df.with_columns(
+        [
             pl.col("pay_date").cast(pl.Date).alias("date"),
             pl.lit(customer_id).alias("customer_id"),
             pl.lit("payroll").alias("series_id"),
@@ -134,12 +130,13 @@ def adapt_payroll_export(df: pl.DataFrame, customer_id: str) -> pl.DataFrame:
             pl.col("gross_pay").cast(pl.Float64).alias("amount"),
             pl.lit("USD").alias("currency"),
             pl.lit(False).alias("is_anomaly"),
-        ])
-        .select(list(CANONICAL_SCHEMA.keys()))
-    )
+        ]
+    ).select(list(CANONICAL_SCHEMA.keys()))
 
 
-def adapt_bank_feed(df: pl.DataFrame, customer_id: str, account_type: str = "operating") -> pl.DataFrame:
+def adapt_bank_feed(
+    df: pl.DataFrame, customer_id: str, account_type: str = "operating"
+) -> pl.DataFrame:
     """
     Adapter for bank feed exports (Plaid, direct OFX/CSV typical schema).
 
@@ -157,23 +154,21 @@ def adapt_bank_feed(df: pl.DataFrame, customer_id: str, account_type: str = "ope
         else PipelineSource.BANK_RESERVE.value
     )
 
-    return (
-        df
-        .with_columns([
+    return df.with_columns(
+        [
             pl.col("date").cast(pl.Date),
             pl.lit(customer_id).alias("customer_id"),
             pl.lit(f"bank_{account_type}").alias("series_id"),
             pl.lit(source).alias("source"),
             pl.when(pl.col("amount") >= 0)
-              .then(pl.lit(CashFlowSign.INFLOW.value))
-              .otherwise(pl.lit(CashFlowSign.OUTFLOW.value))
-              .alias("sign"),
+            .then(pl.lit(CashFlowSign.INFLOW.value))
+            .otherwise(pl.lit(CashFlowSign.OUTFLOW.value))
+            .alias("sign"),
             pl.col("amount").abs().alias("amount"),
             pl.lit("USD").alias("currency"),
             pl.lit(False).alias("is_anomaly"),
-        ])
-        .select(list(CANONICAL_SCHEMA.keys()))
-    )
+        ]
+    ).select(list(CANONICAL_SCHEMA.keys()))
 
 
 def adapt_ar_aging(df: pl.DataFrame, customer_id: str) -> pl.DataFrame:
@@ -187,9 +182,8 @@ def adapt_ar_aging(df: pl.DataFrame, customer_id: str) -> pl.DataFrame:
     if missing:
         raise ValueError(f"AR aging missing columns: {missing}")
 
-    return (
-        df
-        .with_columns([
+    return df.with_columns(
+        [
             pl.col("collection_date").cast(pl.Date).alias("date"),
             pl.lit(customer_id).alias("customer_id"),
             pl.lit("accounts_receivable").alias("series_id"),
@@ -198,9 +192,8 @@ def adapt_ar_aging(df: pl.DataFrame, customer_id: str) -> pl.DataFrame:
             pl.col("amount_collected").cast(pl.Float64).alias("amount"),
             pl.lit("USD").alias("currency"),
             pl.lit(False).alias("is_anomaly"),
-        ])
-        .select(list(CANONICAL_SCHEMA.keys()))
-    )
+        ]
+    ).select(list(CANONICAL_SCHEMA.keys()))
 
 
 def adapt_subscription_billing(df: pl.DataFrame, customer_id: str) -> pl.DataFrame:
@@ -214,9 +207,8 @@ def adapt_subscription_billing(df: pl.DataFrame, customer_id: str) -> pl.DataFra
     if missing:
         raise ValueError(f"Subscription billing missing columns: {missing}")
 
-    return (
-        df
-        .with_columns([
+    return df.with_columns(
+        [
             pl.col("charge_date").cast(pl.Date).alias("date"),
             pl.lit(customer_id).alias("customer_id"),
             pl.lit("sub_billing").alias("series_id"),
@@ -225,9 +217,8 @@ def adapt_subscription_billing(df: pl.DataFrame, customer_id: str) -> pl.DataFra
             pl.col("mrr").cast(pl.Float64).alias("amount"),
             pl.lit("USD").alias("currency"),
             pl.lit(False).alias("is_anomaly"),
-        ])
-        .select(list(CANONICAL_SCHEMA.keys()))
-    )
+        ]
+    ).select(list(CANONICAL_SCHEMA.keys()))
 
 
 # ── IngestPipeline ─────────────────────────────────────────────────────────────
@@ -279,12 +270,13 @@ class IngestPipeline:
         """
         seq = generate_sequence_dataset(n_days=n_days, seed=seed)
         return (
-            seq
-            .rename({"value": "amount"})
-            .with_columns([
-                pl.lit(self.customer_id).alias("customer_id"),
-                pl.lit("USD").alias("currency"),
-            ])
+            seq.rename({"value": "amount"})
+            .with_columns(
+                [
+                    pl.lit(self.customer_id).alias("customer_id"),
+                    pl.lit("USD").alias("currency"),
+                ]
+            )
             .select(list(CANONICAL_SCHEMA.keys()))
         )
 
@@ -299,9 +291,11 @@ class IngestPipeline:
             if missing:
                 raise ValueError(f"Frame {i} missing canonical columns: {missing}")
 
-        merged = pl.concat(frames).unique(
-            subset=["customer_id", "date", "series_id"]
-        ).sort(["customer_id", "series_id", "date"])
+        merged = (
+            pl.concat(frames)
+            .unique(subset=["customer_id", "date", "series_id"])
+            .sort(["customer_id", "series_id", "date"])
+        )
 
         return merged
 
@@ -313,19 +307,27 @@ class IngestPipeline:
         This is the company-level view suitable for forecasting.
         """
         return (
-            df
-            .with_columns(
+            df.with_columns(
                 pl.when(pl.col("sign") == CashFlowSign.INFLOW.value)
-                  .then(pl.col("amount"))
-                  .otherwise(-pl.col("amount"))
-                  .alias("signed_amount")
+                .then(pl.col("amount"))
+                .otherwise(-pl.col("amount"))
+                .alias("signed_amount")
             )
             .group_by(["customer_id", "date"])
-            .agg([
-                pl.col("signed_amount").sum().alias("net_cashflow"),
-                pl.col("signed_amount").filter(pl.col("sign") == CashFlowSign.INFLOW.value).sum().alias("total_inflow"),
-                pl.col("signed_amount").abs().filter(pl.col("sign") == CashFlowSign.OUTFLOW.value).sum().alias("total_outflow"),
-                pl.col("series_id").n_unique().alias("n_sources"),
-            ])
+            .agg(
+                [
+                    pl.col("signed_amount").sum().alias("net_cashflow"),
+                    pl.col("signed_amount")
+                    .filter(pl.col("sign") == CashFlowSign.INFLOW.value)
+                    .sum()
+                    .alias("total_inflow"),
+                    pl.col("signed_amount")
+                    .abs()
+                    .filter(pl.col("sign") == CashFlowSign.OUTFLOW.value)
+                    .sum()
+                    .alias("total_outflow"),
+                    pl.col("series_id").n_unique().alias("n_sources"),
+                ]
+            )
             .sort(["customer_id", "date"])
         )

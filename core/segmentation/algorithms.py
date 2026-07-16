@@ -20,10 +20,10 @@ import numpy as np
 @dataclass
 class ClusterResult:
     algorithm: str
-    labels: np.ndarray          # shape (n_samples,); -1 = noise
-    n_clusters: int             # excludes noise cluster
-    noise_fraction: float       # fraction labelled -1
-    metadata: dict              # algorithm-specific diagnostics
+    labels: np.ndarray  # shape (n_samples,); -1 = noise
+    n_clusters: int  # excludes noise cluster
+    noise_fraction: float  # fraction labelled -1
+    metadata: dict  # algorithm-specific diagnostics
 
 
 def fit_hdbscan(
@@ -154,7 +154,7 @@ def select_best(
         return result
 
     # KMeans sweep
-    best_k, best_sil, best_km = k_range[0], -1.0, None
+    best_sil, best_km = -1.0, None
     for k in range(k_range[0], k_range[1] + 1):
         if k >= len(X):
             break
@@ -163,6 +163,6 @@ def select_best(
             continue
         s = silhouette_score(X, km.labels)
         if s > best_sil:
-            best_sil, best_k, best_km = s, k, km
+            best_sil, best_km = s, km
 
     return best_km if best_km is not None else fit_kmeans(X, n_clusters=min(3, len(X)))

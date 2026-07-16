@@ -7,7 +7,6 @@ from datetime import date
 import numpy as np
 import pytest
 
-from src.agents.state import CategoryType, ForecastHorizon, ForecastResult, ModelVariant
 from evals.graders.graders import (
     CoverageGrader,
     DirectionalGrader,
@@ -16,7 +15,7 @@ from evals.graders.graders import (
     MASEGrader,
     SMAPEGrader,
 )
-
+from src.agents.state import CategoryType, ForecastHorizon, ForecastResult, ModelVariant
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -138,8 +137,10 @@ class TestEvalHarness:
         train = {"erp_revenue": np.array([1000.0 + i * 4 for i in range(200)])}
         harness = EvalHarness(train_data_by_series=train)
         report = harness.run(
-            cycle_id="test-001", forecast_date=date(2024, 1, 1),
-            forecasts=[sample_forecast], actuals_by_series={"erp_revenue": close_actuals},
+            cycle_id="test-001",
+            forecast_date=date(2024, 1, 1),
+            forecasts=[sample_forecast],
+            actuals_by_series={"erp_revenue": close_actuals},
         )
         assert report.overall_mase >= 0
         assert isinstance(report.all_passed, bool)
@@ -147,8 +148,10 @@ class TestEvalHarness:
     def test_empty_actuals_no_crash(self, sample_forecast):
         harness = EvalHarness(train_data_by_series={"erp_revenue": np.ones(200) * 1000.0})
         report = harness.run(
-            cycle_id="test-002", forecast_date=date(2024, 1, 1),
-            forecasts=[sample_forecast], actuals_by_series={},
+            cycle_id="test-002",
+            forecast_date=date(2024, 1, 1),
+            forecasts=[sample_forecast],
+            actuals_by_series={},
         )
         assert report is not None
 
@@ -160,12 +163,16 @@ class TestEvalHarness:
         for _ in range(12):
             harness._drift_grader.update(2.0)  # ratio >> 1.2
         report = harness.run(
-            cycle_id="test-003", forecast_date=date(2024, 1, 1),
-            forecasts=[sample_forecast], actuals_by_series={"erp_revenue": close_actuals},
+            cycle_id="test-003",
+            forecast_date=date(2024, 1, 1),
+            forecasts=[sample_forecast],
+            actuals_by_series={"erp_revenue": close_actuals},
         )
         # Non-drift graders should still pass
         non_drift = [
-            s for scores in report.series_scores.values()
-            for s in scores if s.grader_name != "DriftDetection"
+            s
+            for scores in report.series_scores.values()
+            for s in scores
+            if s.grader_name != "DriftDetection"
         ]
         assert any(s.passed for s in non_drift)

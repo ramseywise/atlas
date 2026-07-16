@@ -74,13 +74,14 @@ def main() -> None:
     console.print(Rule("5. Model Comparison: ARIMA vs Chronos vs Agent"))
     try:
         from evals.comparison import run_model_comparison
-        comparison = run_model_comparison(
+
+        run_model_comparison(
             train_df=split.train,
             horizon_days=30,
             min_train_days=200,
             step_days=30,
-            max_folds=2,       # keep fast for demo
-            models=["arima", "chronos"],   # exclude agent to avoid duplicate CV
+            max_folds=2,  # keep fast for demo
+            models=["arima", "chronos"],  # exclude agent to avoid duplicate CV
             verbose=True,
         )
     except Exception as e:
@@ -95,7 +96,8 @@ def main() -> None:
         entry = {
             "cycle_id": feedback.cycle_id,
             "drift_ratio": final_state["eval_report"].drift_ratio
-            if final_state.get("eval_report") else None,
+            if final_state.get("eval_report")
+            else None,
             "finetune_triggered": feedback.drift_triggered_finetune,
             "reflection": feedback.reflection_text,
         }

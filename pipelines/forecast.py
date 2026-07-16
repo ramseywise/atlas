@@ -18,7 +18,6 @@ from rich.panel import Panel
 from rich.rule import Rule
 
 from core.preprocessing.synthetic import generate_sequence_dataset, temporal_split
-from src.agents.forecast.main import main as _forecast_main
 from src.agents.graph import run_forecasting_agent
 from src.cv_runner import run_walk_forward_cv
 
@@ -52,8 +51,10 @@ def run(
         n_days=n_days,
         seed=seed,
     )
-    console.print(f"  {len(df):,} rows | {df['series_id'].n_unique()} series | "
-                  f"{df['date'].min()} → {df['date'].max()}")
+    console.print(
+        f"  {len(df):,} rows | {df['series_id'].n_unique()} series | "
+        f"{df['date'].min()} → {df['date'].max()}"
+    )
 
     # 2. Split
     console.print(Rule("2. Temporal Split"))
@@ -89,7 +90,8 @@ def run(
         entry = {
             "cycle_id": feedback.cycle_id,
             "drift_ratio": final_state["eval_report"].drift_ratio
-            if final_state.get("eval_report") else None,
+            if final_state.get("eval_report")
+            else None,
             "finetune_triggered": feedback.drift_triggered_finetune,
             "reflection": feedback.reflection_text,
         }

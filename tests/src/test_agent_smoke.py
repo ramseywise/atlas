@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
+from pydantic import ValidationError
 
 from core.preprocessing.synthetic import generate_sequence_dataset
 from src.agents.state import (
@@ -30,7 +31,7 @@ def small_df():
 
 class TestPydanticStateSchemas:
     def test_forecast_result_interval_validation(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             ForecastResult(
                 series_id="test",
                 category=CategoryType.INCOME_RECURRING,
@@ -49,7 +50,7 @@ class TestPydanticStateSchemas:
         assert 1.0 <= s.context_multiplier <= 10.0
 
     def test_planner_strategy_context_multiplier_bounds(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             PlannerStrategy(context_multiplier=0.5)  # below min=1.0
 
 

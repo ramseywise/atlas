@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import numpy as np
 
-
 # ── tsfresh embedding ─────────────────────────────────────────────────────────
 
 
@@ -94,21 +93,21 @@ def _embed_manual(
             float(np.median(arr)),
             float(np.min(arr)),
             float(np.max(arr)),
-            float(np.sum(arr > 0)) / n,           # fraction positive
-            float(np.sum(arr < 0)) / n,           # fraction negative
-            float(np.mean(np.abs(arr))),           # mean absolute
+            float(np.sum(arr > 0)) / n,  # fraction positive
+            float(np.sum(arr < 0)) / n,  # fraction negative
+            float(np.mean(np.abs(arr))),  # mean absolute
             float(np.percentile(arr, 25)),
             float(np.percentile(arr, 75)),
             float(np.percentile(arr, 75) - np.percentile(arr, 25)),  # IQR
             float(np.mean(np.abs(np.diff(arr)))) if n > 1 else 0.0,  # mean abs change
-            float(np.sum(np.abs(np.diff(arr)))) if n > 1 else 0.0,   # total variation
+            float(np.sum(np.abs(np.diff(arr)))) if n > 1 else 0.0,  # total variation
             _autocorr_scalar(arr, lag=7),
             _autocorr_scalar(arr, lag=14),
             _autocorr_scalar(arr, lag=30),
             float(np.sum(arr > mean + 2 * std)) / n,  # fraction outliers high
             float(np.sum(arr < mean - 2 * std)) / n,  # fraction outliers low
             _linear_trend(arr),
-            float(std / (abs(mean) + 1e-8)),       # CV
+            float(std / (abs(mean) + 1e-8)),  # CV
         ]
         rows.append(np.array(feat, dtype=np.float32))
 

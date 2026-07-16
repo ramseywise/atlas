@@ -1,4 +1,4 @@
-# Collaboration — How We Work on 
+# Collaboration — How We Work on
 
 **Last Transformed**: —
 

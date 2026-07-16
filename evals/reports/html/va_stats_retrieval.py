@@ -6,9 +6,9 @@ import re
 from pathlib import Path
 from typing import Any
 
+from evals.metrics.comparison.url_overlap import compute_overlap_retrieval_proxy
 from evals.pipelines.datasets import load_jsonl
 from evals.reports.paths import va_staging_all_responses_path
-from evals.metrics.comparison.url_overlap import compute_overlap_retrieval_proxy
 from evals.reports.utils._sections import retrieval_proxy_block_html
 
 
@@ -39,7 +39,7 @@ def replace_va_detail_retrieval_proxy(html_path: Path, stats: dict, staging: Any
     preamble = (
         '<p class="muted" style="font-size:.85em;margin:0 0 10px">'
         "<b>Canonical retrieval proxy for VA staging</b> — overlap-adjusted (not raw ŷ=has_source). "
-        "Layer-1 pass-rate table: <a href=\"../va/va_suite.html\">va_suite.html</a>.</p>"
+        'Layer-1 pass-rate table: <a href="../va/va_suite.html">va_suite.html</a>.</p>'
     )
     new_block = preamble + overlap_html
 

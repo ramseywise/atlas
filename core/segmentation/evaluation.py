@@ -36,7 +36,7 @@ class SegmentEvalReport:
     calinski_harabasz: float
 
     min_cluster_size: int
-    cluster_sizes: dict[int, int]   # label → count (excludes -1)
+    cluster_sizes: dict[int, int]  # label → count (excludes -1)
 
     silhouette_passed: bool
     db_passed: bool
@@ -75,9 +75,9 @@ def evaluate_clusters(
         SegmentEvalReport with pass/fail flags.
     """
     from sklearn.metrics import (
-        silhouette_score,
-        davies_bouldin_score,
         calinski_harabasz_score,
+        davies_bouldin_score,
+        silhouette_score,
     )
 
     labels = result.labels
@@ -100,7 +100,7 @@ def evaluate_clusters(
 
     # Cluster size distribution
     unique, counts = np.unique(labels_clean, return_counts=True)
-    cluster_sizes = {int(k): int(v) for k, v in zip(unique, counts)}
+    cluster_sizes = {int(k): int(v) for k, v in zip(unique, counts, strict=False)}
     min_size = int(min(counts)) if len(counts) > 0 else 0
 
     if result.noise_fraction > 0.3:

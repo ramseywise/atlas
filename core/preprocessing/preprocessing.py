@@ -31,21 +31,21 @@ from typing import Literal
 import numpy as np
 import polars as pl
 
-
 # ── Result containers ─────────────────────────────────────────────────────────
 
 
 @dataclass
 class StationarityReport:
     """ADF + KPSS test results for a single series."""
+
     series_id: str
     adf_statistic: float
     adf_pvalue: float
-    adf_stationary: bool          # True if ADF rejects unit root (p < 0.05)
+    adf_stationary: bool  # True if ADF rejects unit root (p < 0.05)
     kpss_statistic: float | None  # None if statsmodels unavailable
     kpss_pvalue: float | None
     kpss_stationary: bool | None  # True if KPSS fails to reject stationarity
-    recommended_d: int            # suggested order of differencing
+    recommended_d: int  # suggested order of differencing
     conclusion: str
 
 
@@ -65,7 +65,7 @@ class PreprocessingReport:
     n_gaps_filled: int
     n_outliers_treated: int
     differencing_order: int
-    transform: str           # "none" | "log1p" | "standard" | "minmax"
+    transform: str  # "none" | "log1p" | "standard" | "minmax"
     stationarity: StationarityReport | None
     outlier: OutlierReport | None
     warnings: list[str] = field(default_factory=list)
@@ -75,7 +75,7 @@ class PreprocessingReport:
 class PreprocessingResult:
     df: pl.DataFrame
     reports: dict[str, PreprocessingReport]  # series_id → report
-    scaler_params: dict[str, dict]           # series_id → {mean, std, min, max, log}
+    scaler_params: dict[str, dict]  # series_id → {mean, std, min, max, log}
 
 
 # ── Imputation ────────────────────────────────────────────────────────────────
@@ -143,9 +143,7 @@ def _seasonal_median_fill(
     value_col: str,
     date_col: str,
 ) -> pl.DataFrame:
-    df = df.with_columns(
-        pl.col(date_col).dt.weekday().alias("_dow")
-    )
+    df = df.with_columns(pl.col(date_col).dt.weekday().alias("_dow"))
     dow_medians = (
         df.filter(pl.col(value_col).is_not_null())
         .group_by("_dow")
@@ -154,15 +152,16 @@ def _seasonal_median_fill(
     df = df.join(dow_medians, on="_dow", how="left")
     df = df.with_columns(
         pl.when(pl.col(value_col).is_null())
-          .then(pl.col("_median"))
-          .otherwise(pl.col(value_col))
-          .alias(value_col)
+        .then(pl.col("_median"))
+        .otherwise(pl.col(value_col))
+        .alias(value_col)
     )
     return df.drop(["_dow", "_median"])
 
 
 def _date_range(start: date, end: date) -> list[date]:
     from datetime import timedelta
+
     days = (end - start).days + 1
     return [start + timedelta(days=i) for i in range(days)]
 
@@ -468,9 +467,12 @@ class Preprocessor:
             params = fit_scaler(clean_vals, self.scale_method)
             self._scaler_params[sid] = params
             scaler_params[sid] = {
-                "method": params.method, "mean": params.mean,
-                "std": params.std, "min_val": params.min_val,
-                "max_val": params.max_val, "log_transform": params.log_transform,
+                "method": params.method,
+                "mean": params.mean,
+                "std": params.std,
+                "min_val": params.min_val,
+                "max_val": params.max_val,
+                "log_transform": params.log_transform,
             }
             scaled = apply_scaler(vals, params)
 
@@ -527,11 +529,13 @@ class Preprocessor:
         """Return a DataFrame summarising stationarity test results per series."""
         rows = []
         for sid, r in self._stationarity.items():
-            rows.append({
-                "series_id": sid,
-                "adf_pvalue": r.adf_pvalue,
-                "adf_stationary": r.adf_stationary,
-                "recommended_d": r.recommended_d,
-                "conclusion": r.conclusion,
-            })
+            rows.append(
+                {
+                    "series_id": sid,
+                    "adf_pvalue": r.adf_pvalue,
+                    "adf_stationary": r.adf_stationary,
+                    "recommended_d": r.recommended_d,
+                    "conclusion": r.conclusion,
+                }
+            )
         return pl.DataFrame(rows)

@@ -57,7 +57,10 @@ def build(output_path: Path = OUT_PATH, *, export_figures: bool = True) -> Path:
 
     rows, n_liked, n_disliked, vtag = _golden_grader_calibration_stats()
     body_html = eval_methods_report_body(
-        rows, n_liked=n_liked, n_disliked=n_disliked, vtag=vtag,
+        rows,
+        n_liked=n_liked,
+        n_disliked=n_disliked,
+        vtag=vtag,
     )
 
     ts = datetime.now().strftime("%Y-%m-%d %H:%M UTC")

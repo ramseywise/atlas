@@ -67,9 +67,16 @@ def run(
     console.print(Rule("1. Multi-Customer Synthetic Data"))
     df = _make_multi_customer_df(n_customers=n_customers, n_days=n_days, seed=seed)
     archetype_counts = (
-        df.select(["customer_id", "archetype"]).unique()
-        .group_by("archetype").len().sort("archetype")
-    ) if "archetype" in df.columns else None
+        (
+            df.select(["customer_id", "archetype"])
+            .unique()
+            .group_by("archetype")
+            .len()
+            .sort("archetype")
+        )
+        if "archetype" in df.columns
+        else None
+    )
     console.print(f"  {n_customers} customers | {len(df):,} rows | {n_days} days each")
     if archetype_counts is not None:
         for row in archetype_counts.iter_rows(named=True):

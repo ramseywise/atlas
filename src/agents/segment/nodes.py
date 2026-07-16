@@ -16,24 +16,23 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from src.agents.segment.state import (
-    SegmentResult,
-    SegmentationState,
-    SegmentationStrategy,
-)
 from core.preprocessing.customer import CustomerProfile, build_customer_profiles
-from core.preprocessing.embeddings import embed_tsfresh, embed_chronos
+from core.preprocessing.embeddings import embed_chronos
 from core.segmentation.algorithms import (
     ClusterResult,
+    fit_agglomerative,
+    fit_gmm,
     fit_hdbscan,
     fit_kmeans,
-    fit_gmm,
-    fit_agglomerative,
     select_best,
 )
 from core.segmentation.evaluation import evaluate_clusters
 from core.segmentation.naming import compute_centroids, name_segments
-
+from src.agents.segment.state import (
+    SegmentationState,
+    SegmentationStrategy,
+    SegmentResult,
+)
 
 # ── Profiler ──────────────────────────────────────────────────────────────────
 
@@ -44,10 +43,7 @@ def profiler_node(state: SegmentationState) -> dict[str, Any]:
     profiles = build_customer_profiles(df)
 
     # Store as serialisable arrays keyed by customer_id
-    profile_vectors = {
-        cid: p.to_feature_vector().tolist()
-        for cid, p in profiles.items()
-    }
+    profile_vectors = {cid: p.to_feature_vector().tolist() for cid, p in profiles.items()}
     return {"profile_vectors": profile_vectors}
 
 
@@ -81,9 +77,14 @@ def embedder_node(state: SegmentationState) -> dict[str, Any]:
     # Optional UMAP reduction — only applied when n_components < current feature dim
     # and the sample count is large enough (UMAP requires n_samples > n_components + 1)
     n_components = strategy.get("umap_n_components", 0)
-    if n_components and n_components < matrix_norm.shape[1] and matrix_norm.shape[0] > n_components + 1:
+    if (
+        n_components
+        and n_components < matrix_norm.shape[1]
+        and matrix_norm.shape[0] > n_components + 1
+    ):
         try:
             import umap as umap_lib
+
             reducer = umap_lib.UMAP(
                 n_components=n_components,
                 n_neighbors=min(15, matrix_norm.shape[0] - 1),
@@ -107,7 +108,6 @@ def clusterer_node(state: SegmentationState) -> dict[str, Any]:
     """Run the clustering algorithm specified in strategy."""
     strategy: SegmentationStrategy = state["strategy"]
     X = np.array(state["embedding_matrix"], dtype=np.float32)
-    customer_ids: list[str] = state["embedding_customer_ids"]
 
     algo = strategy["algorithm"]
     k = strategy.get("n_clusters")
@@ -162,7 +162,9 @@ def evaluator_node(state: SegmentationState) -> dict[str, Any]:
         if result.algorithm == "hdbscan":
             # Switch to KMeans; if HDBSCAN found many clusters, try fewer
             next_strategy["algorithm"] = "kmeans"
-            next_strategy["n_clusters"] = max(2, min(report.n_clusters, max(2, report.n_customers // 6)))
+            next_strategy["n_clusters"] = max(
+                2, min(report.n_clusters, max(2, report.n_customers // 6))
+            )
         elif result.algorithm == "kmeans" and report.n_clusters > 2:
             # KMeans also failed — try one fewer cluster
             next_strategy["n_clusters"] = report.n_clusters - 1
@@ -194,7 +196,12 @@ def labeler_node(state: SegmentationState) -> dict[str, Any]:
 
     # If everything was noise (HDBSCAN all-noise edge case), treat as one segment
     if not segment_names:
-        segment_names = {-1: {"label": "Unclustered", "description": "All customers in noise cluster — try KMeans."}}
+        segment_names = {
+            -1: {
+                "label": "Unclustered",
+                "description": "All customers in noise cluster — try KMeans.",
+            }
+        }
 
     result = SegmentResult(
         customer_ids=customer_ids,

@@ -4,6 +4,7 @@ AtlasAgent — top-level orchestrator.
 Routes user queries to forecast, segment, or knowledge tools.
 Uses Claude Haiku to plan tool calls and synthesize the final answer.
 """
+
 from __future__ import annotations
 
 import json
@@ -12,7 +13,6 @@ import os
 from langgraph.graph import END, StateGraph
 
 from src.state import AtlasState, ToolCall
-
 
 # ── Router ────────────────────────────────────────────────────────────────────
 
@@ -53,17 +53,27 @@ Write 2-4 sentences max.
 def router_node(state: AtlasState) -> dict:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        return {"tool_calls": [ToolCall(tool="knowledge", args={"query": state["query"]}, result=None, error=None)]}
+        return {
+            "tool_calls": [
+                ToolCall(tool="knowledge", args={"query": state["query"]}, result=None, error=None)
+            ]
+        }
 
     import anthropic
+
     client = anthropic.Anthropic(api_key=api_key)
     resp = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=256,
-        messages=[{"role": "user", "content": ROUTER_PROMPT.format(
-            query=state["query"],
-            customer_id=state.get("customer_id") or "unknown",
-        )}],
+        messages=[
+            {
+                "role": "user",
+                "content": ROUTER_PROMPT.format(
+                    query=state["query"],
+                    customer_id=state.get("customer_id") or "unknown",
+                ),
+            }
+        ],
     )
     try:
         data = json.loads(resp.content[0].text.strip())
@@ -72,12 +82,15 @@ def router_node(state: AtlasState) -> dict:
             for t in data["tools"]
         ]
     except Exception as e:
-        calls = [ToolCall(tool="knowledge", args={"query": state["query"]}, result=None, error=str(e))]
+        calls = [
+            ToolCall(tool="knowledge", args={"query": state["query"]}, result=None, error=str(e))
+        ]
     return {"tool_calls": calls}
 
 
 def forecast_tool_node(state: AtlasState) -> dict:
     from src.agents.graph import run_forecasting_agent
+
     calls = state["tool_calls"]
     updated = []
     for call in calls:
@@ -98,12 +111,12 @@ def segment_tool_node(state: AtlasState) -> dict:
     for call in calls:
         if call["tool"] == "segment":
             try:
-                from src.agents.segment.graph import run_segmentation_agent
-                import tempfile, os
-                from core.preprocessing.synthetic import generate_sequence_dataset
-                import polars as pl
+                import os
+                import tempfile
 
-                customer_id = call["args"].get("customer_id")
+                from core.preprocessing.synthetic import generate_sequence_dataset
+                from src.agents.segment.graph import run_segmentation_agent
+
                 df = generate_sequence_dataset(n_days=365, seed=42)
                 with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as f:
                     tmp_path = f.name
@@ -111,7 +124,15 @@ def segment_tool_node(state: AtlasState) -> dict:
                     df.write_parquet(tmp_path)
                     result = run_segmentation_agent(tmp_path, max_cycles=2, verbose=False)
                     seg = result.get("result") or {}
-                    updated.append({**call, "result": {"n_segments": seg.get("n_segments", 0), "segment_names": seg.get("segment_names", {})}})
+                    updated.append(
+                        {
+                            **call,
+                            "result": {
+                                "n_segments": seg.get("n_segments", 0),
+                                "segment_names": seg.get("segment_names", {}),
+                            },
+                        }
+                    )
                 finally:
                     os.unlink(tmp_path)
             except Exception as e:
@@ -123,6 +144,7 @@ def segment_tool_node(state: AtlasState) -> dict:
 
 def knowledge_tool_node(state: AtlasState) -> dict:
     from core.knowledge.graph import AtlasGraph
+
     calls = state["tool_calls"]
     updated = []
     for call in calls:
@@ -145,18 +167,27 @@ def synthesizer_node(state: AtlasState) -> dict:
         return {"synthesis": "API key required for synthesis."}
 
     import anthropic
+
     client = anthropic.Anthropic(api_key=api_key)
     tool_results = json.dumps(
-        [{"tool": c["tool"], "result": c["result"], "error": c["error"]} for c in state["tool_calls"]],
+        [
+            {"tool": c["tool"], "result": c["result"], "error": c["error"]}
+            for c in state["tool_calls"]
+        ],
         indent=2,
     )
     resp = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=512,
-        messages=[{"role": "user", "content": SYNTHESIS_PROMPT.format(
-            query=state["query"],
-            tool_results=tool_results,
-        )}],
+        messages=[
+            {
+                "role": "user",
+                "content": SYNTHESIS_PROMPT.format(
+                    query=state["query"],
+                    tool_results=tool_results,
+                ),
+            }
+        ],
     )
     return {"synthesis": resp.content[0].text.strip()}
 
@@ -183,7 +214,11 @@ def build_atlas_graph() -> StateGraph:
     g.add_conditional_edges(
         "router",
         _route_tools,
-        {"forecast_tool": "forecast_tool", "segment_tool": "segment_tool", "knowledge_tool": "knowledge_tool"},
+        {
+            "forecast_tool": "forecast_tool",
+            "segment_tool": "segment_tool",
+            "knowledge_tool": "knowledge_tool",
+        },
     )
     g.add_edge("forecast_tool", "synthesizer")
     g.add_edge("segment_tool", "synthesizer")
@@ -195,11 +230,13 @@ def build_atlas_graph() -> StateGraph:
 
 def run_atlas_agent(query: str, customer_id: str | None = None) -> str:
     graph = build_atlas_graph()
-    result = graph.invoke({
-        "query": query,
-        "customer_id": customer_id,
-        "tool_calls": [],
-        "synthesis": None,
-        "error": None,
-    })
+    result = graph.invoke(
+        {
+            "query": query,
+            "customer_id": customer_id,
+            "tool_calls": [],
+            "synthesis": None,
+            "error": None,
+        }
+    )
     return result.get("synthesis") or "No response generated."

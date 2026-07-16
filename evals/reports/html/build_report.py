@@ -138,7 +138,7 @@ def build(
   <div class="g3">
     <div class="stat"><div class="n">{n:,}</div><div class="lbl">Total turns</div><div class="sub">{n_convs:,} unique conversations</div></div>
     <div class="stat"><div class="n">{n_users:,}</div><div class="lbl">Unique users</div><div class="sub">{avg_q:.1f} words avg query</div></div>
-    <div class="stat"><div class="n" style="color:var(--green)">{cov:.1f}%</div><div class="lbl">Turns rated</div><div class="sub">{s.get('n_liked', 0)} liked · {s.get('n_disliked', 0)} disliked</div></div>
+    <div class="stat"><div class="n" style="color:var(--green)">{cov:.1f}%</div><div class="lbl">Turns rated</div><div class="sub">{s.get("n_liked", 0)} liked · {s.get("n_disliked", 0)} disliked</div></div>
   </div>
 
   <div class="g2">
@@ -155,8 +155,8 @@ def build(
     {_chart_card("Language Breakdown", "langdetect on query text — Danish vs Scandinavian often misclassified; directional only", "golden_language")}
   </div>
 
-  <div class="cue red"><strong>⚠ VA golden already uses Shine URLs — E_grounding is not kb_url_map:</strong>
-    This sample cites <code>help.shine.co</code> (live VA). <code>data/kb_url_map.json</code> fixes Billy↔Shine slug match for
+  <div class="cue red"><strong>⚠ VA golden already uses live KB URLs — E_grounding is not kb_url_map:</strong>
+    This sample cites the live help-center domain (live VA). <code>data/kb_url_map.json</code> fixes legacy↔live slug match for
     retrieval MRR and <code>SourceMatchGrader</code> on BKH-era keys — it does not change the failure taxonomy.
     <strong>E_grounding ({e_grounding_pct:.1f}%)</strong> means disliked + had sources (heuristic), not URL mismatch or LLM GroundingGrader.</div>
 

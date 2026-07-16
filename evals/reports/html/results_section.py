@@ -156,7 +156,7 @@ def _narrative_bkh(report: SuiteReport) -> str:
 <div class="callout amber"><strong>Grounding not scored on BKH.</strong> Pass-rate tables exclude grounding/RAGAS
   (VA staging pipeline only).</div>
 <div class="narrative">
-  <p><strong>Answer relevancy</strong> {ar.get('value', 0):.0%} · <strong>Completeness</strong> {comp.get('value', 0):.0%}
+  <p><strong>Answer relevancy</strong> {ar.get("value", 0):.0%} · <strong>Completeness</strong> {comp.get("value", 0):.0%}
   on n={n_llm} LLM-graded turns.</p>
 </div>
 """
@@ -168,9 +168,13 @@ def _narrative_va(report: SuiteReport) -> str:
 
     bullets = []
     if h.get("completeness", {}).get("passed"):
-        bullets.append(f"<strong>Completeness</strong> {h['completeness']['value']:.0%} — clears gate on rated archive.")
+        bullets.append(
+            f"<strong>Completeness</strong> {h['completeness']['value']:.0%} — clears gate on rated archive."
+        )
     if h.get("escalation", {}).get("passed"):
-        bullets.append(f"<strong>Escalation</strong> {h['escalation']['value']:.0%} — handoff behavior strong.")
+        bullets.append(
+            f"<strong>Escalation</strong> {h['escalation']['value']:.0%} — handoff behavior strong."
+        )
     if h.get("answer_relevancy") and not h["answer_relevancy"].get("passed"):
         bullets.append(
             f"<strong>Answer relevancy</strong> {h['answer_relevancy']['value']:.0%} — still the main product gap."

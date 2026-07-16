@@ -12,7 +12,6 @@ The learner decides whether to continue cycling or terminate based on:
 from __future__ import annotations
 
 import uuid
-from datetime import date
 from typing import Any, Literal
 
 import polars as pl
@@ -25,7 +24,6 @@ from src.agents.nodes import (
     planner_node,
 )
 from src.agents.state import AgentState
-
 
 # ── Routing ───────────────────────────────────────────────────────────────────
 

@@ -133,10 +133,22 @@ def reclassification_overlap_section(staging: Any) -> str:
     exp_pct = f"{100 * float(exp_rate):.1f}%" if exp_rate is not None else "—"
 
     rows = [
-        ("grounded_regression", rc.get("promoted_to_regression", 0), "Promoted from edge_case / verify_grounding"),
-        ("capability_test", rc.get("promoted_to_capability_test", 0), "High composite + grounding threshold"),
-        ("kb_indexing_gap", rc.get("n_kb_indexing_gap", 0), "Billy URL not in KB map"),
-        ("hitl_va_may_be_right", rc.get("n_hitl_va_may_be_right", 0), "Overlap match; human review candidate"),
+        (
+            "grounded_regression",
+            rc.get("promoted_to_regression", 0),
+            "Promoted from edge_case / verify_grounding",
+        ),
+        (
+            "capability_test",
+            rc.get("promoted_to_capability_test", 0),
+            "High composite + grounding threshold",
+        ),
+        ("kb_indexing_gap", rc.get("n_kb_indexing_gap", 0), "Legacy KB URL not in KB map"),
+        (
+            "hitl_va_may_be_right",
+            rc.get("n_hitl_va_may_be_right", 0),
+            "Overlap match; human review candidate",
+        ),
         ("hitl_cs_disagree", rc.get("n_hitl_cs_disagree", 0), "CS disliked but VA may be correct"),
     ]
     body = ""

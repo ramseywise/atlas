@@ -58,13 +58,12 @@ def _gate_card(
     )
 
 
-def _metric_gate_card(m: MetricResult, *, layer: str, threshold_override: float | None = None) -> str:
+def _metric_gate_card(
+    m: MetricResult, *, layer: str, threshold_override: float | None = None
+) -> str:
     thr = threshold_override if threshold_override is not None else m.threshold
     thr_str = f"{thr:.0%}" if thr > 0 else "—"
-    if thr <= 0:
-        passed = None
-    else:
-        passed = m.value >= thr
+    passed = None if thr <= 0 else m.value >= thr
     label = METRIC_FRIENDLY_NAMES.get(m.metric_name, m.metric_name.replace("_", " "))
     sub = f"n={m.n_graded:,}"
     caveat = (m.breakdown or {}).get("caveat", "")
@@ -85,8 +84,7 @@ def _metric_gate_card(m: MetricResult, *, layer: str, threshold_override: float 
 def suite_gate_snapshot_html(report: SuiteReport) -> str:
     """Primary metrics grid above Layer 1/2 tables."""
     is_va = bool(
-        report.heuristic_stats.get("staging_calibration")
-        or report.heuristic_stats.get("va_stats")
+        report.heuristic_stats.get("staging_calibration") or report.heuristic_stats.get("va_stats")
     )
     stats = report.heuristic_stats
     cards: list[str] = []

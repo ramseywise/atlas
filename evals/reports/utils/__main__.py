@@ -107,7 +107,9 @@ def _cmd_deck(args: argparse.Namespace) -> int:
     for name in re.findall(r"<!-- FIGURE:(\w+) -->", html):
         if name in figs:
             html = html.replace(
-                f"<!-- FIGURE:{name} -->", f'<div class="fig-embed">{figs[name]}</div>', 1,
+                f"<!-- FIGURE:{name} -->",
+                f'<div class="fig-embed">{figs[name]}</div>',
+                1,
             )
 
     if args.dry_run:

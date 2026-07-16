@@ -74,7 +74,9 @@ class TestARIMAForecaster:
         forecaster = ARIMAForecaster("test", auto=True)
         forecaster.fit(seasonal_series)
         result = forecaster.predict(horizon=30)
-        for lo, pt, hi in zip(result.lower_80, result.point_forecast, result.upper_80):
+        for lo, pt, hi in zip(
+            result.lower_80, result.point_forecast, result.upper_80, strict=False
+        ):
             assert lo <= pt <= hi, f"Interval violated: lo={lo}, pt={pt}, hi={hi}"
 
     def test_predict_before_fit_raises(self):

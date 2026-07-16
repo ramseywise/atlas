@@ -2,6 +2,7 @@
 Seed MetricDefinition nodes into the knowledge graph on first boot.
 Call: python -m core.knowledge.seeds
 """
+
 from __future__ import annotations
 
 from core.knowledge.graph import AtlasGraph

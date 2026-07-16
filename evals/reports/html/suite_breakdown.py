@@ -5,12 +5,12 @@ from __future__ import annotations
 import html as _html
 
 from evals.metrics._constants import METRIC_FRIENDLY_NAMES, TIER_THRESHOLDS
+from evals.metrics.calibration.grader_scope import COMPARISON_LAYER2_METRICS
 from evals.metrics.suite import SuiteReport
 from evals.reports.html.eval_set_group import (
     _GROUP_ORDER,
     group_display_name,
 )
-from evals.metrics.calibration.grader_scope import COMPARISON_LAYER2_METRICS
 from evals.reports.utils.layout import report_href
 
 
@@ -93,7 +93,12 @@ def _slice_card(
         )
 
     grounding_note = ""
-    if not is_va and group in ("stratified_liked", "stratified_disliked", "regression", "unspecified"):
+    if not is_va and group in (
+        "stratified_liked",
+        "stratified_disliked",
+        "regression",
+        "unspecified",
+    ):
         grounding_note = (
             '<p class="muted" style="font-size:11px;margin:6px 0 0">'
             "Grounding / RAGAS: N/A on BKH cal — see VA suite.</p>"
@@ -145,8 +150,7 @@ def suite_eval_set_breakdown_html(report: SuiteReport) -> str:
         return ""
 
     is_va = bool(
-        report.heuristic_stats.get("staging_calibration")
-        or report.heuristic_stats.get("va_stats")
+        report.heuristic_stats.get("staging_calibration") or report.heuristic_stats.get("va_stats")
     )
     cal_sample = bool(report.heuristic_stats.get("is_calibration_sample"))
     if not cal_sample and report.heuristic_stats.get("slice_grouping") == "sentiment":

@@ -57,8 +57,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 
@@ -66,9 +65,7 @@ from core.preprocessing.preprocessing import (
     StationarityReport,
     check_stationarity,
     difference_series,
-    undifference_series,
 )
-
 
 # ── Assumption diagnostics ─────────────────────────────────────────────────────
 
@@ -76,14 +73,15 @@ from core.preprocessing.preprocessing import (
 @dataclass
 class AssumptionReport:
     """Full diagnostic output from assumption checking."""
+
     series_id: str
     n_obs: int
     stationarity: StationarityReport
-    ljung_box_passed: bool | None       # None if statsmodels unavailable
+    ljung_box_passed: bool | None  # None if statsmodels unavailable
     ljung_box_pvalue: float | None
     heteroskedasticity_passed: bool | None
     arch_pvalue: float | None
-    normality_passed: bool | None       # Jarque-Bera
+    normality_passed: bool | None  # Jarque-Bera
     jb_pvalue: float | None
     min_obs_met: bool
     seasonal_period_detected: int | None
@@ -129,11 +127,12 @@ def check_arima_assumptions(
     ljung_passed = ljung_pval = arch_pval = hetero_passed = jb_passed = jb_pval = None
 
     try:
-        from statsmodels.stats.diagnostic import acorr_ljungbox, het_arch
         from scipy.stats import jarque_bera
+        from statsmodels.stats.diagnostic import acorr_ljungbox, het_arch
 
         # Fit a simple AR(1) to get residuals for diagnostics
-        from statsmodels.tsa.arima.model import ARIMA as StatsARIMA
+        from statsmodels.tsa.arima.model import ARIMA as StatsARIMA  # noqa: N811
+
         d = stat.recommended_d
         work = difference_series(values, d) if d > 0 else values
         work = work[~np.isnan(work)]
@@ -223,7 +222,7 @@ def _detect_seasonal_period(values: np.ndarray, max_period: int = 52) -> int | N
     if n < 2 * max_period:
         return None
     work = values - np.mean(values)
-    autocorr = np.correlate(work, work, mode="full")[n - 1:]
+    autocorr = np.correlate(work, work, mode="full")[n - 1 :]
     autocorr = autocorr[1 : max_period + 1] / (autocorr[0] + 1e-8)
     if len(autocorr) == 0:
         return None
@@ -237,7 +236,7 @@ def _detect_seasonal_period(values: np.ndarray, max_period: int = 52) -> int | N
 @dataclass
 class ARIMAForecastResult:
     series_id: str
-    model_spec: str            # e.g. "ARIMA(2,1,1)" or "AutoARIMA"
+    model_spec: str  # e.g. "ARIMA(2,1,1)" or "AutoARIMA"
     point_forecast: list[float]
     lower_80: list[float]
     upper_80: list[float]
@@ -322,7 +321,9 @@ class ARIMAForecaster:
         if self.auto:
             self._fitted_model = self._fit_auto(values, exog, seasonal_period)
         else:
-            assumption_report = check_arima_assumptions(values, self.series_id, seasonal_period=seasonal_period)
+            assumption_report = check_arima_assumptions(
+                values, self.series_id, seasonal_period=seasonal_period
+            )
             self._fitted_model = self._fit_manual(values, exog)
 
         return assumption_report
@@ -343,7 +344,7 @@ class ARIMAForecaster:
             series_id=self.series_id,
             model_spec=spec,
             point_forecast=[max(0.0, p) for p in point],  # cash flows non-negative
-            lower_80=[max(0.0, l) for l in lower],
+            lower_80=[max(0.0, lo) for lo in lower],
             upper_80=[max(0.0, u) for u in upper],
             aic=aic,
             bic=bic,
@@ -360,16 +361,18 @@ class ARIMAForecaster:
         seasonal_period: int,
     ) -> Any:
         try:
+            import pandas as pd
             from statsforecast import StatsForecast
             from statsforecast.models import AutoARIMA
-            import pandas as pd
 
             n = len(values)
-            df_sf = pd.DataFrame({
-                "unique_id": [self.series_id] * n,
-                "ds": pd.date_range("2020-01-01", periods=n, freq="D"),
-                "y": values.tolist(),
-            })
+            df_sf = pd.DataFrame(
+                {
+                    "unique_id": [self.series_id] * n,
+                    "ds": pd.date_range("2020-01-01", periods=n, freq="D"),
+                    "y": values.tolist(),
+                }
+            )
             sf = StatsForecast(
                 models=[AutoARIMA(season_length=seasonal_period, approximation=True)],
                 freq="D",
@@ -382,12 +385,12 @@ class ARIMAForecaster:
 
     def _fit_manual(self, values: np.ndarray, exog: np.ndarray | None) -> Any:
         try:
-            from statsmodels.tsa.arima.model import ARIMA as StatsARIMA
+            from statsmodels.tsa.arima.model import ARIMA as StatsARIMA  # noqa: N811
 
             p, d, q = self.order
             model = StatsARIMA(values, order=(p, d, q), exog=exog).fit(disp=False)
             return ("statsmodels", model)
-        except Exception as e:
+        except Exception:
             # Fallback: naïve seasonal (lag-7)
             return ("naive", values.copy())
 
@@ -401,13 +404,12 @@ class ARIMAForecaster:
 
         if backend == "statsforecast":
             sf, df_sf = rest
-            import pandas as pd
             pred = sf.predict(h=horizon, level=[level])
             col = "AutoARIMA"
             point = pred[col].tolist()
             lower = pred[f"{col}-lo-{level}"].tolist()
             upper = pred[f"{col}-hi-{level}"].tolist()
-            return point, lower, upper, None, None, f"AutoARIMA(seasonal)"
+            return point, lower, upper, None, None, "AutoARIMA(seasonal)"
 
         elif backend == "statsmodels":
             model = rest[0]
@@ -424,6 +426,7 @@ class ARIMAForecaster:
             vals = rest[0]
             last7 = vals[-7:] if len(vals) >= 7 else vals
             import math
+
             point = list(np.tile(last7, math.ceil(horizon / len(last7)))[:horizon])
             lower = [p * 0.85 for p in point]
             upper = [p * 1.15 for p in point]
@@ -436,15 +439,17 @@ class ARIMAForecaster:
 def _print_assumption_report(report: AssumptionReport) -> None:
     try:
         from rich.console import Console
-        from rich.table import Table
         from rich.panel import Panel
+        from rich.table import Table
 
         console = Console()
-        console.print(Panel.fit(
-            f"[bold]ARIMA Assumption Report — {report.series_id}[/bold]\n"
-            f"n={report.n_obs} obs | "
-            f"Recommended d={report.stationarity.recommended_d}"
-        ))
+        console.print(
+            Panel.fit(
+                f"[bold]ARIMA Assumption Report — {report.series_id}[/bold]\n"
+                f"n={report.n_obs} obs | "
+                f"Recommended d={report.stationarity.recommended_d}"
+            )
+        )
 
         table = Table(show_lines=True)
         table.add_column("Check")
@@ -452,24 +457,36 @@ def _print_assumption_report(report: AssumptionReport) -> None:
         table.add_column("Detail")
 
         def row(name, passed, detail):
-            status = "[green]PASS[/green]" if passed else "[red]FAIL[/red]" if passed is False else "[yellow]N/A[/yellow]"
+            status = (
+                "[green]PASS[/green]"
+                if passed
+                else "[red]FAIL[/red]"
+                if passed is False
+                else "[yellow]N/A[/yellow]"
+            )
             table.add_row(name, status, detail)
 
-        row("Stationarity (ADF)",
+        row(
+            "Stationarity (ADF)",
             report.stationarity.adf_stationary,
-            f"p={report.stationarity.adf_pvalue:.3f} — {report.stationarity.conclusion}")
-        row("Min observations",
-            report.min_obs_met,
-            f"{report.n_obs} obs")
-        row("Residual autocorrelation (Ljung-Box)",
+            f"p={report.stationarity.adf_pvalue:.3f} — {report.stationarity.conclusion}",
+        )
+        row("Min observations", report.min_obs_met, f"{report.n_obs} obs")
+        row(
+            "Residual autocorrelation (Ljung-Box)",
             report.ljung_box_passed,
-            f"p={report.ljung_box_pvalue:.3f}" if report.ljung_box_pvalue else "Not run")
-        row("Homoskedasticity (ARCH)",
+            f"p={report.ljung_box_pvalue:.3f}" if report.ljung_box_pvalue else "Not run",
+        )
+        row(
+            "Homoskedasticity (ARCH)",
             report.heteroskedasticity_passed,
-            f"p={report.arch_pvalue:.3f}" if report.arch_pvalue else "Not run")
-        row("Residual normality (Jarque-Bera)",
+            f"p={report.arch_pvalue:.3f}" if report.arch_pvalue else "Not run",
+        )
+        row(
+            "Residual normality (Jarque-Bera)",
             report.normality_passed,
-            f"p={report.jb_pvalue:.3f}" if report.jb_pvalue else "Not run")
+            f"p={report.jb_pvalue:.3f}" if report.jb_pvalue else "Not run",
+        )
 
         console.print(table)
 
@@ -487,8 +504,10 @@ def _print_assumption_report(report: AssumptionReport) -> None:
 
     except ImportError:
         print(f"\n=== ARIMA Assumptions: {report.series_id} ===")
-        print(f"Stationarity: {'PASS' if report.stationarity.adf_stationary else 'FAIL'} "
-              f"(d={report.stationarity.recommended_d})")
+        print(
+            f"Stationarity: {'PASS' if report.stationarity.adf_stationary else 'FAIL'} "
+            f"(d={report.stationarity.recommended_d})"
+        )
         for v in report.violations:
             print(f"  VIOLATION: {v}")
         for w in report.warnings:

@@ -7,11 +7,11 @@ from pathlib import Path
 
 from evals.graders.judges.base import GraderOutput
 from evals.metrics.base import PassRateMetric
+from evals.metrics.comparison.url_reclassify import run_reclassification_pipeline
 from evals.metrics.stats import eval_stats_metrics
 from evals.metrics.suite import SuiteReport, evaluate_suite
 from evals.pipelines.datasets import load_jsonl
 from evals.reports.paths import DEFAULT_BKH_ALL
-from evals.metrics.comparison.url_reclassify import run_reclassification_pipeline
 from evals.reports.suite import render_suite_html
 from evals.reports.utils.layout import dataset_root, repo_root
 
@@ -30,11 +30,7 @@ def _metric_results_from_graded(query_results: list[dict]):
                     labels=res.get("labels") or {},
                 )
             )
-    return [
-        PassRateMetric(gt).compute(outputs)
-        for gt, outputs in by_grader.items()
-        if outputs
-    ]
+    return [PassRateMetric(gt).compute(outputs) for gt, outputs in by_grader.items() if outputs]
 
 
 def _group_breakdown(
@@ -127,11 +123,7 @@ def assemble_suite_report(
     elif dataset_name in ("bkh", "") or (stats_json_path and "bkh" in str(stats_json_path)):
         dataset_name = "BKH"
 
-    if (
-        not source_path
-        and graded_path
-        and "calibration" in graded_path.name
-    ):
+    if not source_path and graded_path and "calibration" in graded_path.name:
         cal = dataset_root("bkh") / "eval_sets" / "calibration_sample.jsonl"
         if cal.exists():
             source_path = cal
@@ -178,22 +170,27 @@ def assemble_suite_report(
             cal_idx = build_calibration_index()
         judge_metrics = metric_results_from_calibrated(query_results, cal_idx)
         breakdown = group_breakdown_calibrated(
-            query_results, task_meta, cal_idx, prefer_sentiment=False,
+            query_results,
+            task_meta,
+            cal_idx,
+            prefer_sentiment=False,
         )
     else:
         judge_metrics = _metric_results_from_graded(query_results)
         from evals.metrics.calibration.grader_scope import BKH_CALIBRATION_LLM_KEYS
 
         judge_metrics = [m for m in judge_metrics if m.metric_name in BKH_CALIBRATION_LLM_KEYS]
-        prefer_sent = bool(
-            graded_path and "calibration" in graded_path.name
-        )
+        prefer_sent = bool(graded_path and "calibration" in graded_path.name)
         breakdown = _group_breakdown(
-            query_results, task_meta, prefer_sentiment=prefer_sent,
+            query_results,
+            task_meta,
+            prefer_sentiment=prefer_sent,
         )
         if prefer_sent:
             breakdown_scenario = _group_breakdown(
-                query_results, task_meta, prefer_sentiment=False,
+                query_results,
+                task_meta,
+                prefer_sentiment=False,
             )
 
     if judge_metrics:
@@ -228,9 +225,13 @@ def assemble_suite_report(
                 source_tasks,
                 staging.overlap_records,
             )
-    elif is_va and source_path and source_path.exists() and DEFAULT_BKH_ALL.exists() and source_tasks:
+    elif (
+        is_va and source_path and source_path.exists() and DEFAULT_BKH_ALL.exists() and source_tasks
+    ):
         overlap_summary, slice_paths = run_reclassification_pipeline(
-            source_path, DEFAULT_BKH_ALL, export_base_slices=True,
+            source_path,
+            DEFAULT_BKH_ALL,
+            export_base_slices=True,
         )
         heuristic_stats["url_overlap"] = overlap_summary
         meta["reclass_slices"] = slice_paths
@@ -247,7 +248,10 @@ def assemble_suite_report(
 
         raw_gs = compute_llm_pass_summary(graded, GOLDEN_LLM_METRICS_V1, calibrated=False)
         cal_gs = compute_llm_pass_summary(
-            graded, GOLDEN_LLM_METRICS_V1, calibrated=True, cal_index=cal_idx,
+            graded,
+            GOLDEN_LLM_METRICS_V1,
+            calibrated=True,
+            cal_index=cal_idx,
         )
         reclass = (heuristic_stats.get("url_overlap") or {}).get("reclassification") or {}
         by_reason = reclass.get("by_reason") or {}
@@ -256,8 +260,8 @@ def assemble_suite_report(
             "calibrated": cal_gs,
             "metrics": [(k, label, thr) for k, label, thr in GOLDEN_LLM_METRICS_V1],
             "n_calibrated_up": sum(v.get("n_calibrated_up", 0) for v in cal_gs.values()),
-            "n_billypedia_gap": reclass.get("n_grounding_corpus_gap", 0),
-            "n_billypedia_promoted": int(by_reason.get("edge_billypedia_grounding_corpus_gap", 0)),
+            "n_kb_corpus_gap": reclass.get("n_grounding_corpus_gap", 0),
+            "n_kb_corpus_promoted": int(by_reason.get("edge_kb_grounding_corpus_gap", 0)),
             "human_validated_map": str(
                 repo_root() / "data" / "articles" / "kb_url_map" / "human_validated_map.csv"
             ),
@@ -313,7 +317,9 @@ def rebuild_suite_report(
     from evals.reports.html.results_section import suite_results_section
 
     results_html = suite_results_section(
-        suite, is_va=bool(meta.get("is_va")), export_figure=True,
+        suite,
+        is_va=bool(meta.get("is_va")),
+        export_figure=True,
     )
     render_suite_html(suite, output_path, pdf=pdf, results_section_html=results_html)
     print(f"Report: {output_path}")

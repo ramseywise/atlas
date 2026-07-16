@@ -157,7 +157,7 @@ def layer1_heuristics_section(*, n_liked: int, n_disliked: int) -> str:
             "Aspirational north-star — eval samples skew dislike-heavy (~2.5–3:1)",
         ),
     ]
-    for key, label, thr, note in layer1_gates:
+    for _key, label, thr, note in layer1_gates:
         gate_rows += (
             f"<tr><td>{_html.escape(label)}</td>"
             f"<td class='num'>{thr:.0%}</td>"
@@ -337,11 +337,13 @@ def eval_methods_report_body(
     vtag: str,
 ) -> str:
     """Full eval methods narrative: Layer 1 + Layer 2."""
-    return (
-        layer1_heuristics_section(n_liked=n_liked, n_disliked=n_disliked)
-        + layer2_llm_judges_section(
-            rows, n_liked=n_liked, n_disliked=n_disliked, vtag=vtag,
-        )
+    return layer1_heuristics_section(
+        n_liked=n_liked, n_disliked=n_disliked
+    ) + layer2_llm_judges_section(
+        rows,
+        n_liked=n_liked,
+        n_disliked=n_disliked,
+        vtag=vtag,
     )
 
 
@@ -354,7 +356,10 @@ def calibration_methods_section(
 ) -> str:
     """Deprecated alias — use :func:`eval_methods_report_body`."""
     return eval_methods_report_body(
-        rows, n_liked=n_liked, n_disliked=n_disliked, vtag=vtag,
+        rows,
+        n_liked=n_liked,
+        n_disliked=n_disliked,
+        vtag=vtag,
     )
 
 

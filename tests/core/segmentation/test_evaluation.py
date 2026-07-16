@@ -1,14 +1,15 @@
 """Unit tests for core/segmentation/evaluation.py."""
+
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from core.segmentation.algorithms import ClusterResult, fit_kmeans
+from core.segmentation.algorithms import ClusterResult
 from core.segmentation.evaluation import (
-    SILHOUETTE_THRESHOLD,
     DB_THRESHOLD,
     MIN_CLUSTER_SIZE,
+    SILHOUETTE_THRESHOLD,
     SegmentEvalReport,
     evaluate_clusters,
 )
@@ -23,8 +24,7 @@ def blobs_and_labels():
     X = np.vstack([a, b, c]).astype(np.float32)
     labels = np.array([0] * 10 + [1] * 10 + [2] * 10)
     result = ClusterResult(
-        algorithm="kmeans", labels=labels, n_clusters=3,
-        noise_fraction=0.0, metadata={}
+        algorithm="kmeans", labels=labels, n_clusters=3, noise_fraction=0.0, metadata={}
     )
     return X, result
 
@@ -71,8 +71,7 @@ class TestEvaluateClusters:
         labels = np.array([0] * 10 + [1] * 10)
         labels[0] = -1  # mark one as noise
         result = ClusterResult(
-            algorithm="hdbscan", labels=labels, n_clusters=2,
-            noise_fraction=1 / 20, metadata={}
+            algorithm="hdbscan", labels=labels, n_clusters=2, noise_fraction=1 / 20, metadata={}
         )
         report = evaluate_clusters(X, result)
         # Noise customer should not appear in cluster_sizes
@@ -82,8 +81,7 @@ class TestEvaluateClusters:
         X = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
         labels = np.array([0, 1])
         result = ClusterResult(
-            algorithm="kmeans", labels=labels, n_clusters=2,
-            noise_fraction=0.0, metadata={}
+            algorithm="kmeans", labels=labels, n_clusters=2, noise_fraction=0.0, metadata={}
         )
         report = evaluate_clusters(X, result)
         # Should not raise; metrics fall back to zero / 999

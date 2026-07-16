@@ -10,8 +10,8 @@ from evals.reports.html.narratives import (
     bkh_dataset_section,
     va_staging_dataset_section,
 )
-from evals.reports.paths import va_staging_all_responses_stats_path
 from evals.reports.html.stats_profile import reclassification_overlap_section
+from evals.reports.paths import va_staging_all_responses_stats_path
 from evals.reports.utils.embed import (
     chart_card,
     inject_charts_section,
@@ -67,7 +67,7 @@ def _profile_charts_section(n: int, fig_dir: Path, *, prefix: str) -> str:
             f"{prefix}_response_type",
             fig_dir,
         )
-        + "</div>\n<div class=\"grid-2\">\n"
+        + '</div>\n<div class="grid-2">\n'
         + chart_card(
             "Failure mode taxonomy",
             "Share of turns by failure category (raw eval_stats labels)",

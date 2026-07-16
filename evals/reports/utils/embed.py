@@ -10,11 +10,12 @@ CHART_MARKER = "<!-- eval-charts -->"
 NARRATIVE_MARKER = "<!-- eval-narrative -->"
 
 
-
 def read_svg(fig_dir: Path, name: str) -> str:
     path = fig_dir / f"{name}.svg"
     if not path.exists():
-        return f'<p class="chart-note">Missing {name}.svg — run <code>make reports-validate</code></p>'
+        return (
+            f'<p class="chart-note">Missing {name}.svg — run <code>make reports-validate</code></p>'
+        )
     raw = path.read_text(encoding="utf-8")
     raw = re.sub(r"<\?xml[^?]*\?>", "", raw).strip()
     raw = re.sub(r"<!DOCTYPE[^>]*>", "", raw).strip()

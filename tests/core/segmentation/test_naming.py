@@ -1,15 +1,15 @@
 """Unit tests for core/segmentation/naming.py."""
+
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
+from core.preprocessing.customer import CustomerProfile
 from core.segmentation.naming import (
     SegmentLabel,
     compute_centroids,
     name_segments,
 )
-from core.preprocessing.customer import CustomerProfile
 
 
 class TestComputeCentroids:
@@ -57,8 +57,8 @@ class TestNameSegments:
         idx = {n: i for i, n in enumerate(feature_names)}
         n = len(feature_names)
         vec = np.zeros(n, dtype=np.float32)
-        vec[idx["trend_slope_norm"]] = 0.5    # strong upward trend
-        vec[idx["inflow_share"]] = 0.8        # very inflow-dominant
+        vec[idx["trend_slope_norm"]] = 0.5  # strong upward trend
+        vec[idx["inflow_share"]] = 0.8  # very inflow-dominant
         centroids = {0: vec}
         result = name_segments(centroids, feature_names=feature_names)
         assert "Growth" in result[0].label or "Revenue" in result[0].label

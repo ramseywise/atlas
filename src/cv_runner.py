@@ -10,7 +10,7 @@ Follows strict statistical inference rules:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 
 import numpy as np
@@ -18,9 +18,9 @@ import polars as pl
 from rich.console import Console
 from rich.table import Table
 
+from core.preprocessing.synthetic import walk_forward_cv
 from src.agents.graph import run_forecasting_agent
 from src.agents.state import EvalReport
-from core.preprocessing.synthetic import WalkForwardFold, walk_forward_cv
 
 console = Console()
 
@@ -153,8 +153,7 @@ def run_walk_forward_cv(
     for fold in folds:
         if verbose:
             console.print(
-                f"  Fold {fold.fold_idx + 1}: "
-                f"train→{fold.train_end} | val {fold.val_end}"
+                f"  Fold {fold.fold_idx + 1}: train→{fold.train_end} | val {fold.val_end}"
             )
 
         # Build actuals dict from validation fold

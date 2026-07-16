@@ -42,6 +42,8 @@ def report_href(from_corpus: str, to: str) -> str:
     if from_key == to_dir:
         return filename
     return f"../{to_dir}/{filename}"
+
+
 _REPO_MARKERS = ("pyproject.toml", "Makefile", ".git")
 
 REFERENCE_JSONL: dict[str, str] = {
@@ -52,7 +54,7 @@ REFERENCE_JSONL: dict[str, str] = {
 
 
 def repo_root(start: Path | None = None) -> Path:
-    """Galactus repo root (not process CWD)."""
+    """Atlas repo root (not process CWD)."""
     path = (start or Path(__file__)).resolve()
     if path.is_file():
         path = path.parent

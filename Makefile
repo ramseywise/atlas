@@ -72,3 +72,7 @@ clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true
 	find . -name "*.pyc" -delete 2>/dev/null; true
 	rm -rf .pytest_cache .ruff_cache evals/reports/*.jsonl
+
+.PHONY: precommit
+precommit:  ## run all pre-commit hooks (ruff, format, gitleaks, eslint where wired) on all files
+	pre-commit run --all-files

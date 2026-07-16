@@ -47,15 +47,9 @@ def profile_tldr(
     n = int(s.get("n_total", 0))
     rated = float(s.get("rated_pct", 0))
     corpus_label = "BKH production" if corpus == "bkh" else "VA staging archive"
-    suite = (
-        f'<a href="{_html.escape(suite_link)}">suite</a>'
-        if suite_link
-        else "suite"
-    )
+    suite = f'<a href="{_html.escape(suite_link)}">suite</a>' if suite_link else "suite"
     cal = (
-        f' · <a href="{_html.escape(calibration_link)}">calibration</a>'
-        if calibration_link
-        else ""
+        f' · <a href="{_html.escape(calibration_link)}">calibration</a>' if calibration_link else ""
     )
     return (
         f'<div class="callout teal" style="margin-bottom:16px">'
@@ -144,13 +138,13 @@ def pm_comparison_story(*, staging: Any | None = None) -> str:
 <div class="callout amber"><strong>Do not compare BKH grounding to VA.</strong>
   Grounding / RAGAS graders were <em>not</em> run on BKH calibration — they apply to VA staging only.
   Any BKH grounding bar is omitted or N/A by design.</div>
-<div class="callout teal"><strong>Why VA can look &ldquo;better&rdquo;:</strong> help.shine.co vs billy.dk URL overlap is an
+<div class="callout teal"><strong>Why VA can look &ldquo;better&rdquo;:</strong> live vs legacy KB domain URL overlap is an
   infrastructure/domain problem ({exp} paired turns expanded-match {exp_pct} after <code>kb_url_map</code>).
   Reclassification explains dislikes that are really domain mismatch — see overlap table on
   <a href="va/va_suite.html">va_suite.html</a>.</div>
 <div class="narrative">
   <p><strong>Chart to read:</strong> three-way pass rates (BKH cal · VA v1 raw · VA v2 calibrated) — primary gates only.
-  Full methodology (Cohen&rsquo;s d, Billypedia flags, KDE): <a href="calibration.html">calibration.html</a>.
+  Full methodology (Cohen&rsquo;s d, KB corpus-gap flags, KDE): <a href="calibration.html">calibration.html</a>.
   Per-corpus detail: <a href="../bkh/bkh_suite.html">bkh_suite</a> · <a href="va_suite.html">va_suite</a>.</p>
 </div>
 """

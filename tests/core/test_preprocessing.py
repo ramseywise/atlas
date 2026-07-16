@@ -8,14 +8,13 @@ import pytest
 
 from core.preprocessing.preprocessing import (
     Preprocessor,
-    ScalerParams,
     apply_scaler,
+    check_stationarity,
     detect_outliers,
     difference_series,
     fill_gaps,
     fit_scaler,
     inverse_scaler,
-    check_stationarity,
     treat_outliers,
     undifference_series,
 )
