@@ -1,0 +1,19 @@
+# Dependencies / build output
+node_modules/
+web/.next/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Env / secrets
+.env
+.env.local
+
+# Generated
+htmlcov/
+evals/reports/*.jsonl
