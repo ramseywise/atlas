@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import operator
 from datetime import date
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated
 
 from pydantic import BaseModel, Field, model_validator
@@ -16,14 +16,14 @@ from typing_extensions import TypedDict
 # ── Enums ────────────────────────────────────────────────────────────────────
 
 
-class ForecastHorizon(str, Enum):
+class ForecastHorizon(StrEnum):
     WEEK = "7d"
     FORTNIGHT = "14d"
     MONTH = "30d"
     QUARTER = "90d"
 
 
-class ModelVariant(str, Enum):
+class ModelVariant(StrEnum):
     CHRONOS_TINY = "amazon/chronos-t5-tiny"
     CHRONOS_SMALL = "amazon/chronos-t5-small"
     CHRONOS_MINI = "amazon/chronos-t5-mini"
@@ -31,7 +31,7 @@ class ModelVariant(str, Enum):
     STATSFORECAST_ETS = "AutoETS"
 
 
-class CategoryType(str, Enum):
+class CategoryType(StrEnum):
     INCOME_RECURRING = "income_recurring"
     INCOME_VARIABLE = "income_variable"
     EXPENSE_FIXED = "expense_fixed"
@@ -157,3 +157,4 @@ class AgentState(TypedDict):
     max_cycles: int
     terminate: bool
     error: str | None
+    learner_policy_name: str

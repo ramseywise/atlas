@@ -10,7 +10,6 @@ Four nodes, each receives AgentState and returns a partial state update:
 
 from __future__ import annotations
 
-import json
 import math
 import os
 import uuid
@@ -21,6 +20,9 @@ import numpy as np
 import polars as pl
 
 from evals.graders.graders import EvalHarness
+from src.agents.learner.bandit import BanditPolicy
+from src.agents.learner.base import LearnerPolicy
+from src.agents.learner.rule_based import RuleBasedPolicy
 from src.agents.state import (
     AgentState,
     CategoryType,
@@ -31,6 +33,11 @@ from src.agents.state import (
     ModelVariant,
     PlannerStrategy,
 )
+
+POLICY_REGISTRY: dict[str, type[LearnerPolicy]] = {
+    "rule_based": RuleBasedPolicy,
+    "bandit": BanditPolicy,
+}
 
 # ── Horizon map ───────────────────────────────────────────────────────────────
 
@@ -279,18 +286,18 @@ Output JSON schema:
 }"""
 
 
-def learner_node(state: AgentState) -> dict[str, Any]:
-    """
-    Reflects on the eval report and updates the forecasting strategy.
-    Uses Claude Haiku for low-cost reflection (one call per cycle).
-    Applies rule-based fallback if API unavailable.
-    """
-    report: EvalReport = state["eval_report"]
-    strategy: PlannerStrategy = state["strategy"]
-    cycle_count = state.get("cycle_count", 0)
-    max_cycles = state.get("max_cycles", 5)
+def _get_learner_policy(policy_name: str) -> LearnerPolicy:
+    """Instantiate a learner policy from the registry."""
+    policy_cls = POLICY_REGISTRY.get(policy_name)
+    if policy_cls is None:
+        policy_cls = RuleBasedPolicy
+    return policy_cls()
 
-    # Build the reflection prompt
+
+def _generate_reflection(
+    report: EvalReport, strategy: PlannerStrategy, cycle_count: int, max_cycles: int
+) -> str:
+    """Generate LLM reflection text (optional enrichment, not used for strategy selection)."""
     user_message = f"""Current cycle {cycle_count + 1}/{max_cycles}.
 
 Eval report:
@@ -307,49 +314,59 @@ Current strategy:
 - context_multiplier: {strategy.context_multiplier}
 - feature_flags: {strategy.feature_flags}
 
-Update the strategy. Output only JSON."""
-
-    updated_json: dict = {}
-    reflection_text = ""
+Summarize in 2-3 sentences what happened this cycle and what should change."""
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if api_key:
-        try:
-            import anthropic
+    if not api_key:
+        return (
+            f"Cycle eval: MASE={report.overall_mase:.3f}, SMAPE={report.overall_smape:.1f}%, "
+            f"Dir={report.directional_accuracy:.1f}%, Cov={report.coverage_80:.1f}%."
+        )
 
-            client = anthropic.Anthropic(api_key=api_key)
-            response = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=600,
-                system=LEARNER_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_message}],
-            )
-            raw = response.content[0].text.strip()
-            updated_json = json.loads(raw)
-            reflection_text = updated_json.get("reflection_text", "")
-        except Exception:
-            updated_json = {}
+    try:
+        import anthropic
 
-    # Rule-based fallback (also used to fill gaps)
-    if not updated_json:
-        updated_json = _rule_based_strategy_update(report, strategy)
-        reflection_text = updated_json.get("reflection_text", "Rule-based adaptation applied.")
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            system=LEARNER_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_message}],
+        )
+        return response.content[0].text.strip()
+    except Exception:
+        return (
+            f"Cycle eval: MASE={report.overall_mase:.3f}, SMAPE={report.overall_smape:.1f}%, "
+            f"Dir={report.directional_accuracy:.1f}%, Cov={report.coverage_80:.1f}%."
+        )
 
-    # Build updated PlannerStrategy
-    new_strategy = PlannerStrategy(
-        horizon=ForecastHorizon(updated_json.get("horizon", strategy.horizon.value)),
-        model_variant=ModelVariant(updated_json.get("model_variant", strategy.model_variant.value)),
-        context_multiplier=float(
-            updated_json.get("context_multiplier", strategy.context_multiplier)
-        ),
-        feature_flags=updated_json.get("feature_flags", strategy.feature_flags),
-        rationale=updated_json.get("rationale", ""),
-    )
 
-    drift_detected = bool(updated_json.get("drift_detected", report.drift_ratio > 1.2))
-    drift_finetune = bool(updated_json.get("drift_triggered_finetune", report.drift_ratio > 1.4))
+def learner_node(state: AgentState) -> dict[str, Any]:
+    """
+    Reflects on the eval report and updates the forecasting strategy.
+    Delegates strategy selection to pluggable LearnerPolicy (rule_based, bandit, rl).
+    Optionally enriches with LLM reflection text.
+    """
+    report: EvalReport = state["eval_report"]
+    strategy: PlannerStrategy = state["strategy"]
+    cycle_count = state.get("cycle_count", 0)
+    max_cycles = state.get("max_cycles", 5)
+    policy_name = state.get("learner_policy_name", "rule_based")
 
-    changes = updated_json.get("strategy_changes", _diff_strategies(strategy, new_strategy))
+    policy = _get_learner_policy(policy_name)
+
+    # Update policy with current cycle's outcome
+    policy.update(report, strategy)
+
+    # Select next strategy
+    new_strategy = policy.select_strategy(report, strategy, cycle_count)
+
+    # Generate reflection text (LLM enrichment, decoupled from strategy)
+    reflection_text = _generate_reflection(report, strategy, cycle_count, max_cycles)
+
+    drift_detected = report.drift_ratio > 1.2
+    drift_finetune = report.drift_ratio > 1.4
+    changes = _diff_strategies(strategy, new_strategy)
 
     feedback = LearnerFeedback(
         cycle_id=report.cycle_id,
@@ -367,58 +384,6 @@ Update the strategy. Output only JSON."""
         "strategy": new_strategy,
         "cycle_count": cycle_count + 1,
         "terminate": terminate,
-    }
-
-
-def _rule_based_strategy_update(
-    report: EvalReport,
-    strategy: PlannerStrategy,
-) -> dict:
-    """Deterministic rule-based strategy update — no LLM required."""
-    model_ladder = [
-        ModelVariant.CHRONOS_TINY,
-        ModelVariant.CHRONOS_MINI,
-        ModelVariant.CHRONOS_SMALL,
-    ]
-    current_idx = (
-        model_ladder.index(strategy.model_variant) if strategy.model_variant in model_ladder else 0
-    )
-
-    new_idx = current_idx
-    ctx_mult = strategy.context_multiplier
-    flags = dict(strategy.feature_flags)
-    changes: list[str] = []
-
-    if report.overall_mase > 0.9:
-        new_idx = min(current_idx + 1, len(model_ladder) - 1)
-        changes.append(f"Upgraded model: {model_ladder[current_idx]} → {model_ladder[new_idx]}")
-
-    if report.overall_smape > 20.0:
-        flags["decompose_by_category"] = True
-        changes.append("Enabled decompose_by_category due to high SMAPE")
-
-    if report.directional_accuracy < 55.0:
-        ctx_mult = min(ctx_mult + 1.0, 8.0)
-        changes.append(f"Increased context_multiplier to {ctx_mult}")
-
-    if report.coverage_80 < 70.0:
-        new_idx = min(new_idx + 1, len(model_ladder) - 1)
-        changes.append("Upgraded model for better interval calibration")
-
-    return {
-        "horizon": strategy.horizon.value,
-        "model_variant": model_ladder[new_idx].value,
-        "context_multiplier": ctx_mult,
-        "feature_flags": flags,
-        "rationale": " | ".join(changes) if changes else "No changes — metrics within thresholds",
-        "drift_detected": report.drift_ratio > 1.2,
-        "drift_triggered_finetune": report.drift_ratio > 1.4,
-        "reflection_text": (
-            f"Cycle eval: MASE={report.overall_mase:.3f}, SMAPE={report.overall_smape:.1f}%, "
-            f"Dir={report.directional_accuracy:.1f}%, Cov={report.coverage_80:.1f}%. "
-            + (f"Changes: {', '.join(changes)}" if changes else "Strategy maintained.")
-        ),
-        "strategy_changes": changes,
     }
 
 

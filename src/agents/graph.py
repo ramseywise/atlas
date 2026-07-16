@@ -65,6 +65,7 @@ def run_forecasting_agent(
     series_df: pl.DataFrame,
     actuals: dict[str, list[float]] | None = None,
     max_cycles: int = 5,
+    learner_policy: str = "rule_based",
     verbose: bool = True,
 ) -> dict[str, Any]:
     """
@@ -75,6 +76,7 @@ def run_forecasting_agent(
         actuals:     Optional dict of series_id → actual values for the forecast period.
                      If None, uses pseudo-actuals from the tail of training data.
         max_cycles:  Maximum number of plan→forecast→eval→learn iterations
+        learner_policy: Policy for strategy adaptation ("rule_based", "bandit")
         verbose:     Print cycle summaries
 
     Returns:
@@ -96,6 +98,7 @@ def run_forecasting_agent(
         "max_cycles": max_cycles,
         "terminate": False,
         "error": None,
+        "learner_policy_name": learner_policy,
     }
 
     final_state = graph.invoke(initial_state)
