@@ -1,4 +1,4 @@
-.PHONY: test test-fast test-core test-graders test-arima test-smoke test-features test-segment test-segment-smoke lint format run forecast segment compare clean
+.PHONY: test test-fast test-core test-graders test-arima test-smoke test-features test-segment test-segment-smoke test-crypto test-learner lint format run forecast segment crypto crypto-monitor compare compare-learner clean
 
 # ── Test targets ──────────────────────────────────────────────────────────────
 
@@ -32,6 +32,12 @@ test-segment:
 test-segment-smoke:
 	uv run pytest tests/src/agents/test_segment_smoke.py -v
 
+test-crypto:
+	uv run pytest tests/src/agents/crypto/ tests/core/crypto/ tests/evals/test_crypto_graders.py -v
+
+test-learner:
+	uv run pytest tests/src/agents/learner/ -v
+
 # ── Pipelines ─────────────────────────────────────────────────────────────────
 
 forecast:
@@ -39,6 +45,12 @@ forecast:
 
 segment:
 	uv run python -m pipelines.segment
+
+crypto:
+	uv run python -m pipelines.crypto
+
+crypto-monitor:
+	uv run python -m pipelines.crypto_monitor
 
 # ── Dev servers ───────────────────────────────────────────────────────────────
 
@@ -65,6 +77,9 @@ run:
 
 compare:
 	uv run python -c "from core.preprocessing.synthetic import generate_sequence_dataset, temporal_split; from evals.comparison import run_model_comparison; df = generate_sequence_dataset(n_days=730, seed=42); split = temporal_split(df); run_model_comparison(split.train, horizon_days=30, max_folds=3, models=['arima', 'chronos'])"
+
+compare-learner:
+	uv run python -c "from evals.comparison_learner import run_learner_comparison; run_learner_comparison()"
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 

@@ -48,6 +48,29 @@ class MetricResponse(BaseModel):
     formula: str | None
 
 
+class CryptoPredictRequest(BaseModel):
+    symbol: str = "BTC/USDT"
+    exchange: str = "binance"
+    timeframe: str = "1d"
+    prediction_types: list[str] = ["direction", "absolute"]
+    max_cycles: int = 2
+    learner_policy: str = "bandit"
+
+
+class CryptoPredictResponse(BaseModel):
+    predictions: list[dict]
+    eval_summary: str
+    cycles_run: int
+
+
+class CryptoStatsResponse(BaseModel):
+    total_trades: int
+    win_rate: float
+    cumulative_pnl: float
+    sharpe: float
+    open_positions: int
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 
@@ -133,3 +156,92 @@ def get_metric(name: str):
     if not result:
         raise HTTPException(status_code=404, detail=f"Metric '{name}' not found.")
     return MetricResponse(name=name, definition=result["definition"], formula=result.get("formula"))
+
+
+# ── Crypto Routes ────────────────────────────────────────────────────────────
+
+
+@app.post("/crypto/predict", response_model=CryptoPredictResponse)
+def crypto_predict(req: CryptoPredictRequest):
+    """Run a crypto prediction cycle."""
+    try:
+        import asyncio
+
+        from core.preprocessing.crypto.fetcher import CryptoFetcher
+        from core.preprocessing.crypto.indicators import add_all_indicators
+        from src.agents.crypto.graph import run_crypto_agent
+
+        async def _fetch():
+            async with CryptoFetcher(exchange=req.exchange) as fetcher:
+                return await fetcher.fetch_ohlcv(
+                    symbol=req.symbol, timeframe=req.timeframe, limit=200
+                )
+
+        df = asyncio.run(_fetch())
+        df = add_all_indicators(df)
+        sym_key = req.symbol.replace("/", "_")
+
+        result = run_crypto_agent(
+            ohlcv_data={sym_key: df},
+            symbols=[req.symbol],
+            max_cycles=req.max_cycles,
+            learner_policy=req.learner_policy,
+            verbose=False,
+        )
+
+        predictions = result.get("predictions", [])
+        pred_dicts = [
+            {
+                "symbol": p.symbol,
+                "type": p.prediction_type.value,
+                "direction": p.direction.value if p.direction else None,
+                "confidence": p.direction_confidence,
+                "point_forecast": p.point_forecast[:5] if p.point_forecast else None,
+                "spread_value": p.spread_value,
+            }
+            for p in predictions
+        ]
+
+        eval_report = result.get("eval_report")
+        summary = eval_report.summary if eval_report else "No evaluation"
+
+        return CryptoPredictResponse(
+            predictions=pred_dicts,
+            eval_summary=summary,
+            cycles_run=result.get("cycle_count", 0),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/crypto/predictions")
+def crypto_predictions(limit: int = 50):
+    """List recent crypto predictions from the log."""
+    import json
+    from pathlib import Path
+
+    log_path = Path("data/crypto/predictions.jsonl")
+    if not log_path.exists():
+        return {"predictions": []}
+
+    lines = log_path.read_text().strip().split("\n")
+    predictions = [json.loads(line) for line in lines[-limit:]]
+    return {"predictions": predictions}
+
+
+@app.get("/crypto/stats", response_model=CryptoStatsResponse)
+def crypto_stats():
+    """Paper trading statistics."""
+    from pathlib import Path
+
+    from src.agents.crypto.paper_trading import PaperTrader
+
+    state_path = Path("data/crypto/paper_trader.json")
+    if not state_path.exists():
+        return CryptoStatsResponse(
+            total_trades=0, win_rate=0.0, cumulative_pnl=0.0, sharpe=0.0, open_positions=0
+        )
+
+    trader = PaperTrader.load(state_path)
+    stats = trader.stats()
+    return CryptoStatsResponse(**stats)
