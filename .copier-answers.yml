@@ -1,0 +1,21 @@
+# Changes here will be overwritten by Copier
+_commit: 8de7828
+_src_path: /Users/wiseer/workspace/ai-project-template
+data_sensitivity: internal
+enable_macos_notifications: true
+enable_structure_guard: false
+expensive_command_patterns: ''
+global_skills_source: vendored
+has_typescript: false
+include_agent_reference_library: true
+include_dev_companion: false
+include_mcp_server: true
+mcp_server_language: python
+mcp_server_name: ''
+mcp_server_slug: ''
+project_description: 'TODO: describe this project'
+project_name: ''
+project_slug: ''
+scaffold_full_project: false
+source_root: src
+ticket_prefix: LIN

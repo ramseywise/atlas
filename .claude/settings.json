@@ -1,0 +1,208 @@
+{
+  "hooks": {
+
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "path=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty'); [ -z \"$path\" ] && exit 0; echo \"$path\" | grep -qE '\\.py$' || exit 0; python3 -m py_compile \"$path\" 2>&1 && uv run ruff format --quiet \"$path\" 2>/dev/null; uv run ruff check --quiet --fix \"$path\" 2>/dev/null; exit 0",
+            "timeout": 15,
+            "statusMessage": "Checking syntax and formatting..."
+          }
+          , {
+            "type": "command",
+            "command": "bash .claude/hooks/code_quality.sh",
+            "timeout": 10,
+            "statusMessage": "Enforcing code standards..."
+          }
+          
+          
+          
+          , {
+            "type": "command",
+            "command": "bash .claude/hooks/function_complexity_warning.sh",
+            "timeout": 10,
+            "statusMessage": "Checking function complexity..."
+          }
+          , {
+            "type": "command",
+            "command": "bash .claude/hooks/sdk_lint.sh",
+            "timeout": 10,
+            "statusMessage": "Checking SDK patterns..."
+          }
+          , {
+            "type": "command",
+            "command": "bash .claude/hooks/test_coverage.sh",
+            "timeout": 15,
+            "statusMessage": "Checking test coverage..."
+          }
+          , {
+            "type": "command",
+            "command": "bash .claude/hooks/public_api_test_check.sh",
+            "timeout": 15,
+            "statusMessage": "Checking public API tests..."
+          }
+          , {
+            "type": "command",
+            "command": "bash .claude/hooks/docs_hygiene.sh",
+            "timeout": 10,
+            "statusMessage": "Checking docs hygiene..."
+          }
+          , {
+            "type": "command",
+            "command": "bash .claude/hooks/memory_duplication_guard.sh",
+            "timeout": 10,
+            "statusMessage": "Checking memory overlap..."
+          }
+          , {
+            "type": "command",
+            "command": "path=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty'); [ -z \"$path\" ] && exit 0; echo \"$path\" | grep -qE '\\.py$' || exit 0; result=$(uv run pyright \"$path\" 2>&1); rc=$?; [ $rc -ne 0 ] && echo \"Pyright: $(echo \"$result\" | grep -E 'error|warning' | head -5)\" >&2; exit 0",
+            "timeout": 30,
+            "statusMessage": "Type checking..."
+          }
+          , {
+            "type": "command",
+            "command": "path=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty'); [ -z \"$path\" ] && exit 0; echo \"$path\" | grep -qE '\\.py$' || exit 0; lines=$(wc -l < \"$path\" 2>/dev/null || echo 0); [ \"$lines\" -gt 400 ] && echo \"Warning: $path is $lines lines (>400) — consider splitting\" >&2; exit 0",
+            "timeout": 5,
+            "statusMessage": "Checking file size..."
+          }
+          , {
+            "type": "command",
+            "command": "path=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty'); echo \"$path\" | grep -qE '\\.claude/docs/(CHANGELOG\\.md|research/|plans/|reviews/)' && touch .claude/.phase_complete; exit 0",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/risky_git_guard.sh",
+            "timeout": 5,
+            "statusMessage": "Blocking risky git commands..."
+          }
+          , {
+            "type": "command",
+            "command": "bash .claude/hooks/branch_guard.sh",
+            "timeout": 5,
+            "statusMessage": "Checking branch naming..."
+          }
+          , {
+            "type": "command",
+            "command": "status=$(echo \"$CLAUDE_TOOL_RESPONSE\" | jq -r '.exitCode // empty' 2>/dev/null); [ -z \"$status\" ] || [ \"$status\" = \"0\" ] && exit 0; mkdir -p .claude && echo \"$CLAUDE_TOOL_INPUT\" | jq -c --arg rc \"$status\" '{ts:(now|todate),cmd:.command,rc:$rc}' >> .claude/friction-log.jsonl 2>/dev/null; exit 0",
+            "timeout": 5
+          }
+          , {
+            "type": "command",
+            "command": "cmd=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.command // empty'); echo \"$cmd\" | grep -qE 'pytest' || exit 0; duration=$(echo \"$CLAUDE_TOOL_RESPONSE\" | jq -r '.duration // 0' 2>/dev/null); [ \"${duration:-0}\" -gt 30000 ] 2>/dev/null && osascript -e 'display notification \"Tests finished (>30s)\" with title \"Claude Code\"' 2>/dev/null; exit 0",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+
+    "Stop": [
+      {
+        "hooks": [
+          
+          {
+            "type": "command",
+            "command": "osascript -e 'display notification \"Claude has finished\" with title \"Claude Code\"' 2>/dev/null; exit 0",
+            "timeout": 5
+          }
+          
+        ]
+      }
+    ],
+
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \".claude/.phase_complete\" ] && { rm -f .claude/.phase_complete; printf '{\"type\":\"context\",\"content\":\"Phase/step complete. Compact if needed before proceeding. Preserve: current position, test count, gotchas, next action.\"}'; exit 0; }; exit 0",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/secrets_scan.sh",
+            "timeout": 5,
+            "statusMessage": "Scanning for secrets..."
+          }
+          
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.command'); echo \"$cmd\" | grep -qE 'git commit' || exit 0; uv run pytest tests/ --tb=short -q 2>&1; rc=$?; [ $rc -eq 0 ] && exit 0; echo 'Tests are failing. Fix them before committing.' >&2; exit 2",
+            "timeout": 120,
+            "statusMessage": "Running tests before commit..."
+          }
+          , {
+            "type": "command",
+            "command": "cmd=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.command'); echo \"$cmd\" | grep -qE 'git commit' || exit 0; uv lock --check 2>&1; rc=$?; [ $rc -eq 0 ] && exit 0; echo 'uv.lock is out of sync with pyproject.toml — run: uv lock' >&2; exit 2",
+            "timeout": 15,
+            "statusMessage": "Checking lockfile sync..."
+          }
+          
+          , {
+            "type": "command",
+            "command": "bash .claude/hooks/docs_scope_guard.sh",
+            "timeout": 5,
+            "statusMessage": "Checking docs scope..."
+          }
+          
+          , {
+            "type": "command",
+            "command": "cmd=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.command'); echo \"$cmd\" | grep -qE '^pip install|^pip3 install' && { echo 'Use uv, not pip. Run: uv add <package>' >&2; exit 2; } || exit 0",
+            "timeout": 5
+          }
+          , {
+            "type": "command",
+            "command": "cmd=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.command'); echo \"$cmd\" | grep -qE 'rm -rf /|rm -rf ~|DROP TABLE|TRUNCATE TABLE' && { echo 'Blocked: destructive command.' >&2; exit 2; } || exit 0",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+
+  "permissions": {
+    "allow": [
+      "Edit(.claude/**)",
+      "Write(.claude/**)",
+      "Bash(uv run *)",
+      "Bash(make *)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.local)",
+      "Read(.env.production)",
+      "Read(.env.staging)",
+      "Read(*credentials*)",
+      "Read(*secret*)",
+      "Read(*_key*)",
+      "Write(.env)",
+      "Write(.env.*)",
+      "Write(production.*)"
+    ]
+  },
+
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "60000"
+  }
+}

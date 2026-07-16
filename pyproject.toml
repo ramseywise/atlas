@@ -1,0 +1,76 @@
+[project]
+name = "atlas"
+version = "0.1.0"
+description = "Cash flow forecasting and customer segmentation agent"
+requires-python = ">=3.12"
+dependencies = [
+    # Core data
+    "polars>=1.0.0",
+    "numpy>=1.26.0",
+    "pandas>=2.0.0",          # statsforecast requires pandas
+
+    # ML / forecasting
+    "scikit-learn>=1.4.0",
+    "statsforecast>=1.7.0",
+    "statsmodels>=0.14.0",
+    "scipy>=1.12.0",
+
+    # Clustering
+    "hdbscan>=0.8.38",
+
+    # LangGraph / Anthropic
+    "langgraph>=0.2.0",
+    "anthropic>=0.40.0",
+
+    # Knowledge graph
+    "neo4j>=5.0.0",
+
+    # API
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+
+    # Reporting
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+chronos = [
+    "torch>=2.0.0",
+    "chronos-forecasting>=1.0.0",
+]
+tsfresh = [
+    "tsfresh>=0.20.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.6.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["core", "src", "evals", "api", "pipelines"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
