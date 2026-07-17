@@ -12,6 +12,11 @@ TODO: describe this project
 ├── .agents/skills/                 Tool-agnostic ADK/LangGraph reference library — see .agents/skills/README.md
 ```
 
+## Refs (read before writing code here)
+
+- `~/.claude/refs/python.md`, `logging.md`, `ml.md`, `langgraph.md`
+- Folder-level refs in `web/CLAUDE.md` (auto-loads when touching frontend files)
+
 ## Hard Rules
 
 <!-- Add project-specific hard rules here, e.g. confidentiality/naming boundaries, module ownership,
@@ -19,7 +24,7 @@ TODO: describe this project
      document the ones that can't be — see .claude/hooks/ for the current hook-enforced set. -->
 
 1. Tests live at root `tests/`, not inside `src/`.
-2. `.claude/docs/plans/` and `.claude/docs/reviews/` are scratch/local workspace — never commit them. Promote durable findings into project docs instead.
+2. `.claude/docs/plans/` is scratch/local workspace — never commit it (one doc per work item, `YYYY-MM-DD-<slug>.md` with a `Status:` line; research/plan/review are sections of that doc). Promote durable findings into project docs instead.
 4. Data classification: **internal**.
 
 ## Style
@@ -34,7 +39,7 @@ TODO: describe this project
 
 **PostToolUse (Write|Edit):** ruff format + check, no `print()` in src/, no bare `except`, no mutable default arguments, no hardcoded model strings, no bare LLM/tracing-client instantiation outside factory files, secrets scan, file size warning >400 lines.
 
-**PreToolUse (Bash):** `git commit` blocked if tests fail or `uv.lock` is out of sync, `.claude/docs/plans/` or `.claude/docs/reviews/` blocked from being staged or committed, `pip install` blocked (use `uv add`), destructive commands blocked.
+**PreToolUse (Bash):** `git commit` blocked if tests fail or `uv.lock` is out of sync, `.claude/docs/plans/` blocked from being staged or committed (hook also still guards the legacy `reviews/` path), `pip install` blocked (use `uv add`), destructive commands blocked.
 
 See `.claude/skills/README.md` for the full skill inventory.
 

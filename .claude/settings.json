@@ -104,8 +104,8 @@
     "allow": [
       "Edit(.claude/**)",
       "Write(.claude/**)",
-      "Bash(uv run *)",
-      "Bash(make *)"
+      "Bash(uv run:*)",
+      "Bash(make:*)"
     ],
     "deny": [
       "Read(.env)",
