@@ -12,7 +12,6 @@ This directory holds **atlas-specific** skills only:
 
 | Skill | What it does |
 |---|---|
-| `akira` | Proactive codebase quality agent (kiyoko / kaneda / dao modes) |
 | `claude-insights` | Workflow signals from session logs |
 | `debug` | Focused diagnose/fix/verify loop |
 | `define-epic` / `plan-epic` | ROADMAP.md epic definition and task breakdown |
