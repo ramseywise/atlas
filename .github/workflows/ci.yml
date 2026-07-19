@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    uses: ramseywise/ai-project-template/.github/workflows/python-ci.yml@main
+    with:
+      # Makefile's `lint:` runs ruff over `.`, which pulls in nbks/ notebooks
+      # (1 format failure, and most of the 69 repo-wide errors). Scoped here to
+      # the source dirs: 22 errors, format clean. Makefile is the drifting one.
+      lint-paths: "src core evals tests"
+      # Non-blocking pending the 22-error paydown — see the CI/CD plan doc.
+      lint-blocking: false
+      # No tests/unit split in this repo; the whole suite is fast enough (~100s).
+      test-command: "uv run pytest tests/ -q"
