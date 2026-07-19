@@ -62,9 +62,13 @@ seed-knowledge:
 
 # ── Code quality ──────────────────────────────────────────────────────────────
 
+# Scoped to the source dirs, matching .github/workflows/ci.yml's lint-paths.
+# Linting `.` also pulls in nbks/ notebooks, whose churn is not worth gating on.
+LINT_PATHS = src core evals tests
+
 lint:
-	uv run ruff check .
-	uv run ruff format --check .
+	uv run ruff check $(LINT_PATHS)
+	uv run ruff format --check $(LINT_PATHS)
 
 format:
 	uv run ruff format .
