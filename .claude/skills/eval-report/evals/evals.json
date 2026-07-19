@@ -1,0 +1,9 @@
+[
+  {"input": "/eval-report", "expected": true},
+  {"input": "build the HTML eval report from the latest forecast run", "expected": true},
+  {"input": "generate the eval figures and assemble the HTML report after segmentation", "expected": true},
+  {"input": "the pipeline finished — open the eval report in the browser", "expected": true},
+  {"input": "run the ML experiment comparing the two forecast models", "expected": false},
+  {"input": "investigate why segment quality dropped in the latest run", "expected": false},
+  {"input": "run the segmentation pipeline on the new cohort data", "expected": false}
+]

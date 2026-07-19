@@ -1,0 +1,10 @@
+[
+  {"input": "/segment-analysis", "expected": true},
+  {"input": "run and interpret the customer segmentation results from the latest pipeline run", "expected": true},
+  {"input": "investigate why segment 4 looks noisy — check embedding choice and algorithm", "expected": true},
+  {"input": "query the Neo4j knowledge graph for inter-segment relationships", "expected": true},
+  {"input": "evaluate segment quality after the new cohort was added", "expected": true},
+  {"input": "build the HTML eval report from the segmentation outputs", "expected": false},
+  {"input": "compare two forecasting models on the holdout set", "expected": false},
+  {"input": "run a hyperparameter sweep for the forecast pipeline", "expected": false}
+]

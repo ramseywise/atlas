@@ -1,0 +1,10 @@
+[
+  {"input": "/ml-experiment", "expected": true},
+  {"input": "compare the XGBoost and LightGBM forecast models on the holdout set", "expected": true},
+  {"input": "run a hyperparameter sweep and read the results against the baseline", "expected": true},
+  {"input": "validate whether the new approach improves on the current forecast quality", "expected": true},
+  {"input": "investigate why the eval scores look off in the segmentation results", "expected": true},
+  {"input": "build the HTML eval report from the pipeline outputs", "expected": false},
+  {"input": "run the segmentation pipeline on the new customer cohort", "expected": false},
+  {"input": "query the customer segment profiles for cluster 3", "expected": false}
+]
