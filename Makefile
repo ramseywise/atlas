@@ -1,3 +1,5 @@
+include ~/.claude/Makefile.common
+
 .PHONY: test test-fast test-core test-graders test-arima test-smoke test-features test-segment test-segment-smoke test-crypto test-learner lint format run forecast segment crypto crypto-monitor compare compare-learner clean
 
 # ── Test targets ──────────────────────────────────────────────────────────────
@@ -91,7 +93,3 @@ clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true
 	find . -name "*.pyc" -delete 2>/dev/null; true
 	rm -rf .pytest_cache .ruff_cache evals/reports/*.jsonl
-
-.PHONY: precommit
-precommit:  ## run all pre-commit hooks (ruff, format, gitleaks, eslint where wired) on all files
-	pre-commit run --all-files
