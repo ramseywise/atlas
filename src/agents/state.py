@@ -156,5 +156,6 @@ class AgentState(TypedDict):
     cycle_count: int
     max_cycles: int
     terminate: bool
+    consecutive_pass_count: int
     error: str | None
     learner_policy_name: str
