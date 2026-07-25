@@ -166,10 +166,15 @@ def forecaster_node(state: AgentState) -> dict[str, Any]:
     forecasts: list[ForecastResult] = []
     forecast_date = date.today()
 
+    # In simulation mode (no actuals provided), exclude the last horizon_days rows from
+    # training to prevent data leakage — the evaluator uses those rows as pseudo-actuals.
+    simulation_mode = not state.get("actuals")
+
     for series_id in series_data["series_id"].unique().to_list():
-        series_df = (
-            series_data.filter(pl.col("series_id") == series_id).sort("date").tail(context_days)
-        )
+        series_sorted = series_data.filter(pl.col("series_id") == series_id).sort("date")
+        if simulation_mode:
+            series_sorted = series_sorted.head(len(series_sorted) - horizon_days)
+        series_df = series_sorted.tail(context_days)
         values = series_df["value"].to_numpy()
         # Derive category from sign column (synthetic data has no "category" column)
         sign = series_df["sign"][0] if "sign" in series_df.columns else "inflow"
@@ -218,12 +223,11 @@ def evaluator_node(state: AgentState) -> dict[str, Any]:
     # Build train arrays for MASE scaling
     train_arrays: dict[str, np.ndarray] = {}
     for sid in series_data["series_id"].unique().to_list():
-        train_arrays[sid] = (
-            series_data.filter(pl.col("series_id") == sid)
-            .sort("date")
-            .head(-horizon_days if horizon_days < len(series_data) else len(series_data))["value"]
-            .to_numpy()
-        )
+        filtered = series_data.filter(pl.col("series_id") == sid).sort("date")
+        n = len(filtered)
+        train_arrays[sid] = filtered.head(-horizon_days if horizon_days < n else n)[
+            "value"
+        ].to_numpy()
 
     harness = EvalHarness(
         train_data_by_series=train_arrays,
