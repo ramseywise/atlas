@@ -10,6 +10,7 @@ Four nodes, each receives AgentState and returns a partial state update:
 
 from __future__ import annotations
 
+import logging
 import math
 import os
 import uuid
@@ -33,6 +34,8 @@ from src.agents.state import (
     ModelVariant,
     PlannerStrategy,
 )
+
+logger = logging.getLogger(__name__)
 
 POLICY_REGISTRY: dict[str, type[LearnerPolicy]] = {
     "rule_based": RuleBasedPolicy,
@@ -107,7 +110,8 @@ def _run_statsforecast_fallback(
         lower = pred["AutoETS-lo-80"].tolist()
         upper = pred["AutoETS-hi-80"].tolist()
         return point, lower, upper
-    except Exception:
+    except Exception as exc:
+        logger.warning(f"StatsForecast fallback failed, using naïve seasonal: {exc}", exc_info=True)
         # Last resort: naïve seasonal (lag-7) with fixed ±15% intervals
         last = series_values[-7:] if len(series_values) >= 7 else series_values
         point = np.tile(last, math.ceil(horizon_days / len(last)))[:horizon_days].tolist()
@@ -145,7 +149,10 @@ def _run_chronos(
         lower = quantiles[0, :, 0].numpy().tolist()
         upper = quantiles[0, :, 2].numpy().tolist()
         return point, lower, upper
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            f"Chronos inference failed, falling back to StatsForecast: {exc}", exc_info=True
+        )
         # Chronos not installed or no GPU — graceful degradation
         return _run_statsforecast_fallback(series_values, horizon_days)
 
@@ -336,9 +343,11 @@ Summarize in 2-3 sentences what happened this cycle and what should change."""
             max_tokens=300,
             system=LEARNER_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_message}],
+            timeout=30,
         )
         return response.content[0].text.strip()
-    except Exception:
+    except Exception as exc:
+        logger.warning(f"LLM reflection failed, using fallback summary: {exc}", exc_info=True)
         return (
             f"Cycle eval: MASE={report.overall_mase:.3f}, SMAPE={report.overall_smape:.1f}%, "
             f"Dir={report.directional_accuracy:.1f}%, Cov={report.coverage_80:.1f}%."
@@ -381,12 +390,20 @@ def learner_node(state: AgentState) -> dict[str, Any]:
         strategy_changes=changes,
     )
 
-    terminate = cycle_count + 1 >= max_cycles or (report.all_passed and cycle_count >= 2)
+    consecutive_pass_count = state.get("consecutive_pass_count", 0)
+    if report.all_passed:
+        consecutive_pass_count += 1
+    else:
+        consecutive_pass_count = 0
+
+    terminate = cycle_count + 1 >= max_cycles or consecutive_pass_count >= 2
 
     return {
         "learner_feedback": feedback,
         "strategy": new_strategy,
+        "strategy_history": [new_strategy],
         "cycle_count": cycle_count + 1,
+        "consecutive_pass_count": consecutive_pass_count,
         "terminate": terminate,
     }
 

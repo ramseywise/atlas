@@ -97,6 +97,7 @@ def run_forecasting_agent(
         "cycle_count": 0,
         "max_cycles": max_cycles,
         "terminate": False,
+        "consecutive_pass_count": 0,
         "error": None,
         "learner_policy_name": learner_policy,
     }
