@@ -50,6 +50,7 @@ def ab_highlight_cards(va_report) -> str:
 def ab_delta_table_html() -> str:
     """Primary gates: BKH baseline vs VA calibrated with Δ column."""
     from evals.reports.paths import bkh_stats_path
+
     from evals.reports.utils.figures import benchmark_layer2_cohorts
 
     layer2, bkh_n, n_va = benchmark_layer2_cohorts()

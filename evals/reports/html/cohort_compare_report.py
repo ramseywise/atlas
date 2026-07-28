@@ -6,9 +6,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from evals.reports.html.ab_comparison import ab_delta_table_html, ab_highlight_cards
-from evals.reports.html.pm_narratives import comparison_sample_blurb
-from evals.reports.html.suite_corpus_compare import suite_corpus_compare_html
 from evals.reports.paths import (
     bkh_calibration_quality_path,
     bkh_compare_qa_path,
@@ -18,6 +15,10 @@ from evals.reports.paths import (
     va_staging_all_responses_path,
     va_staging_all_responses_stats_path,
 )
+
+from evals.reports.html.ab_comparison import ab_delta_table_html, ab_highlight_cards
+from evals.reports.html.pm_narratives import comparison_sample_blurb
+from evals.reports.html.suite_corpus_compare import suite_corpus_compare_html
 from evals.reports.utils._rebuild import assemble_suite_report
 from evals.reports.utils.embed import chart_card
 from evals.reports.utils.figures import (

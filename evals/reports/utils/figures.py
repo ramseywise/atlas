@@ -20,7 +20,6 @@ matplotlib.use("Agg")  # headless — no display required
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
-
 from evals.metrics.base import THRESHOLDS
 
 # ---------------------------------------------------------------------------
