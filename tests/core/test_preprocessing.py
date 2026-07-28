@@ -32,11 +32,11 @@ def sample_series() -> pl.DataFrame:
 
 class TestFillGaps:
     def test_forward_fill_no_crash(self, sample_series):
-        filled, gaps = fill_gaps(sample_series, value_col="amount")
+        filled, _gaps = fill_gaps(sample_series, value_col="amount")
         assert filled["amount"].null_count() == 0
 
     def test_interpolate_no_crash(self, sample_series):
-        filled, gaps = fill_gaps(sample_series, value_col="amount", method="interpolate")
+        filled, _gaps = fill_gaps(sample_series, value_col="amount", method="interpolate")
         assert filled["amount"].null_count() == 0
 
     def test_gap_count_reported(self, sample_series):

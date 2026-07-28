@@ -2197,7 +2197,7 @@ def fig_bkh_overview() -> Path:
 
     # Left: response type donut
     ax = axes[0]
-    wedges, texts, autotexts = ax.pie(
+    _wedges, _texts, autotexts = ax.pie(
         sizes,
         labels=labels,
         colors=colors_pie,
@@ -2224,7 +2224,7 @@ def fig_bkh_overview() -> Path:
     ]
     ft_sizes = [79.6, 15.1, 4.2, 0.6, 0.2, 0.3]
     ft_colors = [SLATE, AMBER, PURPLE, RED, "#f97316", GREEN]
-    wedges2, texts2, autotexts2 = ax2.pie(
+    _wedges2, _texts2, autotexts2 = ax2.pie(
         ft_sizes,
         labels=ft_labels,
         colors=ft_colors,

@@ -1705,7 +1705,7 @@ def _export_figures_from_report(configs: dict, config_keys: list[str]) -> None:
         # Build display-labelled config dict for the MRR chart
         display_configs: dict = {}
         for key in config_keys:
-            label, desc = _CONFIG_LABELS.get(key, (key, ""))
+            label, _desc = _CONFIG_LABELS.get(key, (key, ""))
             mrr = configs[key].get("aggregate", {}).get("mrr", 0) if key in configs else 0
             display_configs[key] = {"display_label": label, "aggregate": {"mrr": mrr}}
 
