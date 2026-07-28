@@ -7,6 +7,7 @@ import html as _html
 from evals.metrics._constants import METRIC_FRIENDLY_NAMES, TIER_THRESHOLDS
 from evals.metrics.calibration.grader_scope import COMPARISON_LAYER2_METRICS
 from evals.metrics.suite import SuiteReport
+
 from evals.reports.html.eval_set_group import (
     _GROUP_ORDER,
     group_display_name,

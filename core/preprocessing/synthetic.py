@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
-from enum import Enum
+from enum import StrEnum
 
 import numpy as np
 import polars as pl
@@ -45,7 +45,7 @@ RANDOM_SEED = 42
 # ── Enums ─────────────────────────────────────────────────────────────────────
 
 
-class PipelineSource(str, Enum):
+class PipelineSource(StrEnum):
     """Real-world data pipeline sources that contribute to company cash flow."""
 
     ERP_REVENUE = "erp_revenue"
@@ -64,7 +64,7 @@ class PipelineSource(str, Enum):
     MARKETPLACE_PAYOUT = "marketplace_payout"  # seller payouts (outflow)
 
 
-class CashFlowSign(str, Enum):
+class CashFlowSign(StrEnum):
     INFLOW = "inflow"
     OUTFLOW = "outflow"
 

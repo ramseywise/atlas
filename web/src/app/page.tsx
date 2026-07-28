@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Card, TextInput, Button, Text, Badge } from "@tremor/react";
 import { api, AskResponse } from "@/lib/api";
 
 export default function Home() {
@@ -33,42 +32,48 @@ export default function Home() {
           <p className="text-gray-400 text-sm mt-1">Financial intelligence — forecast · segment · explain</p>
         </div>
 
-        <Card className="bg-gray-900 border-gray-800">
+        <div className="rounded-lg border bg-gray-900 border-gray-800 p-4">
           <div className="space-y-3">
-            <TextInput
+            <input
+              type="text"
               placeholder="Ask anything — 'what is my runway?' or 'explain burn ratio'"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAsk()}
-              className="bg-gray-800 border-gray-700 text-white"
+              className="w-full rounded-md bg-gray-800 border border-gray-700 text-white px-3 py-2 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <TextInput
+            <input
+              type="text"
               placeholder="Customer ID (optional)"
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
-              className="bg-gray-800 border-gray-700 text-white"
+              className="w-full rounded-md bg-gray-800 border border-gray-700 text-white px-3 py-2 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <Button onClick={handleAsk} loading={loading} className="w-full">
-              Ask Atlas
-            </Button>
+            <button
+              onClick={handleAsk}
+              disabled={loading}
+              className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Asking…" : "Ask Atlas"}
+            </button>
           </div>
-        </Card>
+        </div>
 
         {error && (
-          <Card className="bg-red-950 border-red-800">
-            <Text className="text-red-300">{error}</Text>
-          </Card>
+          <div className="rounded-lg border bg-red-950 border-red-800 p-4">
+            <p className="text-red-300">{error}</p>
+          </div>
         )}
 
         {result && (
-          <Card className="bg-gray-900 border-gray-800 space-y-3">
+          <div className="rounded-lg border bg-gray-900 border-gray-800 p-4 space-y-3">
             <div className="flex gap-2 flex-wrap">
               {result.tool_calls_made.map((t) => (
-                <Badge key={t} color="blue" size="xs">{t}</Badge>
+                <span key={t} className="inline-flex items-center rounded-md bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400 ring-1 ring-inset ring-blue-500/20">{t}</span>
               ))}
             </div>
-            <Text className="text-gray-100 leading-relaxed">{result.answer}</Text>
-          </Card>
+            <p className="text-gray-100 leading-relaxed">{result.answer}</p>
+          </div>
         )}
       </div>
     </main>

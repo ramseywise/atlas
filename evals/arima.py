@@ -162,7 +162,7 @@ def check_arima_assumptions(
                 )
 
             # Jarque-Bera: normality of residuals
-            jb_stat, jb_pval_raw = jarque_bera(resid)
+            _jb_stat, jb_pval_raw = jarque_bera(resid)
             jb_pval = float(jb_pval_raw)
             jb_passed = jb_pval > 0.05
             if not jb_passed:
@@ -403,7 +403,7 @@ class ARIMAForecaster:
         backend, *rest = self._fitted_model
 
         if backend == "statsforecast":
-            sf, df_sf = rest
+            sf, _df_sf = rest
             pred = sf.predict(h=horizon, level=[level])
             col = "AutoARIMA"
             point = pred[col].tolist()

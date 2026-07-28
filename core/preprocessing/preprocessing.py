@@ -261,7 +261,7 @@ def check_stationarity(
         d = 0
         working = values.copy()
         while d < max_d:
-            stat, p, *_ = adfuller(working, autolag="AIC")
+            _stat, p, *_ = adfuller(working, autolag="AIC")
             if p < 0.05:
                 break
             working = np.diff(working)

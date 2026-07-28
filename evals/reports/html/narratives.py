@@ -208,6 +208,7 @@ def _production_threshold(key: str) -> float:
 
 def _report_panel_threshold(key: str) -> float:
     from evals.metrics._constants import get_threshold
+
     from evals.reports.utils.figures import _CALIBRATION_THRESHOLD_OVERRIDES
 
     return _CALIBRATION_THRESHOLD_OVERRIDES.get(key, get_threshold(key))

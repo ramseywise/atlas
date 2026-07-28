@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from evals.metrics.suite import SuiteReport
+
 from evals.reports.html.ab_comparison import (
     ab_delta_table_html,
     ab_highlight_cards,
