@@ -36,6 +36,12 @@ class AtlasGraph:
     def close(self):
         self._driver.close()
 
+    def __enter__(self) -> AtlasGraph:
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
+
     @contextmanager
     def session(self):
         with self._driver.session() as s:

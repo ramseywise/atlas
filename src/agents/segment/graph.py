@@ -10,6 +10,7 @@ Loop guard: max_cycles hard stop.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Literal
 
 from langgraph.graph import END, START, StateGraph
@@ -22,6 +23,8 @@ from src.agents.segment.nodes import (
     profiler_node,
 )
 from src.agents.segment.state import SegmentationState, SegmentationStrategy, SegmentResult
+
+logger = logging.getLogger(__name__)
 
 # ── Routing ───────────────────────────────────────────────────────────────────
 
@@ -153,6 +156,8 @@ def _print_summary(state: dict[str, Any]) -> None:
     except ImportError:
         result = state.get("result")
         if result:
-            print(
-                f"\nSegmentation done: {result['n_segments']} segments, {len(result['customer_ids'])} customers"
+            logger.info(
+                "Segmentation done: %d segments, %d customers",
+                result["n_segments"],
+                len(result["customer_ids"]),
             )

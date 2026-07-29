@@ -337,9 +337,11 @@ Summarize in 2-3 sentences what happened this cycle and what should change."""
     try:
         import anthropic
 
+        from src.config import ATLAS_LLM_MODEL
+
         client = anthropic.Anthropic(api_key=api_key)
         response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model=ATLAS_LLM_MODEL,
             max_tokens=300,
             system=LEARNER_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_message}],

@@ -100,11 +100,35 @@ class TestATR:
         assert np.all(atr_values >= 0)
 
 
+class TestRSIEdgeCases:
+    def test_rsi_all_gains_is_100(self):
+        """Monotonically increasing close -> loss==0 -> RSI should be 100, not NaN/inf."""
+        df = pl.DataFrame({"close": [float(i) for i in range(1, 20)]})
+        result = compute_rsi(df, period=5)
+        rsi_values = result["rsi"].drop_nulls().to_numpy()
+        assert np.all(np.isfinite(rsi_values))
+        assert np.allclose(rsi_values, 100.0)
+
+    def test_rsi_flat_price_is_50(self):
+        """Constant close -> gain==0 and loss==0 -> RSI should be 50 (neutral), not NaN."""
+        df = pl.DataFrame({"close": [100.0] * 20})
+        result = compute_rsi(df, period=5)
+        rsi_values = result["rsi"].drop_nulls().to_numpy()
+        assert np.all(np.isfinite(rsi_values))
+        assert np.allclose(rsi_values, 50.0)
+
+
 class TestVolumeSMA:
     def test_volume_columns_exist(self):
         df = compute_volume_sma(_make_ohlcv())
         assert "volume_sma" in df.columns
         assert "volume_ratio" in df.columns
+
+    def test_volume_ratio_zero_volume_window_is_null_not_inf(self):
+        """A window of all-zero volume must yield null volume_ratio, not inf."""
+        df = pl.DataFrame({"volume": [0.0] * 25})
+        result = compute_volume_sma(df, period=5)
+        assert not result["volume_ratio"].is_infinite().any()
 
 
 class TestAddAllIndicators:

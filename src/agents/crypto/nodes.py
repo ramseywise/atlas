@@ -73,6 +73,7 @@ def crypto_forecaster_node(state: CryptoAgentState) -> dict[str, Any]:
         if len(close_values) < 10:
             continue
 
+        current_price = float(close_values[-1])
         model_id = strategy.model_variant.value
         point, lower, upper = _forecast_series(close_values, strategy.forecast_bars, model_id)
 
@@ -89,8 +90,7 @@ def crypto_forecaster_node(state: CryptoAgentState) -> dict[str, Any]:
                 )
             )
 
-        if PredictionType.DIRECTION in strategy.prediction_types:
-            current_price = float(close_values[-1])
+        if PredictionType.DIRECTION in strategy.prediction_types and current_price > 0:
             forecast_mean = np.mean(point)
             pct_change = (forecast_mean - current_price) / current_price
 

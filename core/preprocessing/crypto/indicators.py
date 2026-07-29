@@ -10,14 +10,21 @@ import polars as pl
 
 
 def compute_rsi(df: pl.DataFrame, period: int = 14) -> pl.DataFrame:
-    """Relative Strength Index (0-100). Oversold < 30, Overbought > 70."""
+    """Relative Strength Index (0-100). Oversold < 30, Overbought > 70.
+
+    When loss==0 and gain>0 (all gains), RSI is 100 (maximally overbought).
+    When both gain==0 and loss==0 (flat price), RSI is 50 (neutral).
+    """
     delta = pl.col("close").diff()
     gain = delta.clip(lower_bound=0).rolling_mean(window_size=period)
     loss = (-delta.clip(upper_bound=0)).rolling_mean(window_size=period)
 
-    return df.with_columns(
-        (100.0 - 100.0 / (1.0 + gain / loss)).alias("rsi"),
+    rsi = (
+        pl.when(loss == 0)
+        .then(pl.when(gain == 0).then(50.0).otherwise(100.0))
+        .otherwise(100.0 - 100.0 / (1.0 + gain / loss))
     )
+    return df.with_columns(rsi.alias("rsi"))
 
 
 def compute_macd(
@@ -81,11 +88,11 @@ def compute_atr(df: pl.DataFrame, period: int = 14) -> pl.DataFrame:
 
 def compute_volume_sma(df: pl.DataFrame, period: int = 20) -> pl.DataFrame:
     """Volume simple moving average for volume spike detection."""
+    volume_sma = pl.col("volume").rolling_mean(window_size=period)
+    volume_ratio = pl.when(volume_sma == 0).then(None).otherwise(pl.col("volume") / volume_sma)
     return df.with_columns(
-        pl.col("volume").rolling_mean(window_size=period).alias("volume_sma"),
-        (pl.col("volume") / pl.col("volume").rolling_mean(window_size=period)).alias(
-            "volume_ratio"
-        ),
+        volume_sma.alias("volume_sma"),
+        volume_ratio.alias("volume_ratio"),
     )
 
 
