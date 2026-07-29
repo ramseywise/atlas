@@ -61,9 +61,11 @@ def router_node(state: AtlasState) -> dict:
 
     import anthropic
 
+    from src.config import ATLAS_LLM_MODEL
+
     client = anthropic.Anthropic(api_key=api_key)
     resp = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model=ATLAS_LLM_MODEL,
         max_tokens=256,
         messages=[
             {
@@ -150,9 +152,8 @@ def knowledge_tool_node(state: AtlasState) -> dict:
     for call in calls:
         if call["tool"] == "knowledge":
             try:
-                g = AtlasGraph()
-                results = g.search_metrics(call["args"].get("query", ""))
-                g.close()
+                with AtlasGraph() as g:
+                    results = g.search_metrics(call["args"].get("query", ""))
                 updated.append({**call, "result": {"metrics": results}})
             except Exception as e:
                 updated.append({**call, "error": str(e)})
@@ -168,6 +169,8 @@ def synthesizer_node(state: AtlasState) -> dict:
 
     import anthropic
 
+    from src.config import ATLAS_LLM_MODEL
+
     client = anthropic.Anthropic(api_key=api_key)
     tool_results = json.dumps(
         [
@@ -177,7 +180,7 @@ def synthesizer_node(state: AtlasState) -> dict:
         indent=2,
     )
     resp = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model=ATLAS_LLM_MODEL,
         max_tokens=512,
         messages=[
             {

@@ -96,13 +96,15 @@ def _call_haiku(centroid_json: dict, api_key: str) -> dict | None:
     try:
         import anthropic
 
+        from src.config import ATLAS_LLM_MODEL
+
         client = anthropic.Anthropic(api_key=api_key)
         user_msg = (
             f"Cluster centroids:\n{json.dumps(centroid_json, indent=2)}\n\nName each segment."
         )
 
         response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model=ATLAS_LLM_MODEL,
             max_tokens=800,
             system=NAMING_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_msg}],

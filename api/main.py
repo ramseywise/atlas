@@ -129,13 +129,11 @@ def get_segments():
     try:
         from core.knowledge.graph import AtlasGraph
 
-        g = AtlasGraph()
-        with g.session() as s:
+        with AtlasGraph() as g, g.session() as s:
             result = s.run(
                 "MATCH (s:Segment) RETURN s.id AS id, s.label AS label, s.description AS description"
             )
             segments = [dict(r) for r in result]
-        g.close()
         return SegmentResponse(segments=segments)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -150,9 +148,11 @@ def refresh_segments():
 def get_metric(name: str):
     from core.knowledge.graph import AtlasGraph
 
-    g = AtlasGraph()
-    result = g.lookup_metric(name)
-    g.close()
+    try:
+        with AtlasGraph() as g:
+            result = g.lookup_metric(name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
     if not result:
         raise HTTPException(status_code=404, detail=f"Metric '{name}' not found.")
     return MetricResponse(name=name, definition=result["definition"], formula=result.get("formula"))
