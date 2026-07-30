@@ -8,7 +8,7 @@ from __future__ import annotations
 import operator
 from datetime import date
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import TypedDict
@@ -134,6 +134,14 @@ class AgentState(TypedDict):
     cycle_id: str
     series_data: dict  # polars DataFrame serialized as dict — deserialized per node
     actuals: dict | None  # for eval: actual values for the forecast period
+    customer_id: str | None  # optional: used to scope memory store
+
+    # Context engineering — memory + retrieval (agent-context.md §2 priority ordering)
+    # Loaded by context_load_node before planner; written by context_save_node after learner.
+    # Static (survives compaction): system prompt lives in node constants.
+    # Dynamic (loaded per run): memory_context injected here.
+    # Ephemeral (evicted after use): tool results, scratch — not stored here.
+    memory_context: dict[str, Any] | None  # formatted context from ForecastMemoryStore
 
     # Planner output
     strategy: PlannerStrategy | None

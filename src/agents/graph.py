@@ -18,6 +18,8 @@ import polars as pl
 from langgraph.graph import END, START, StateGraph
 
 from src.agents.nodes import (
+    context_load_node,
+    context_save_node,
     evaluator_node,
     forecaster_node,
     learner_node,
@@ -41,19 +43,41 @@ def should_continue(state: AgentState) -> Literal["planner", "__end__"]:
 
 
 def build_forecasting_graph() -> StateGraph:
-    """Build and compile the forecasting agent graph."""
+    """
+    Build and compile the forecasting agent graph.
+
+    Graph topology (context nodes added for memory + retrieval):
+      START → context_load → planner → forecaster → evaluator → learner
+               ↑                                                     │
+               └─────────────────────────────────────────────────────┘
+                                   (loop or END via context_save → END)
+
+    context_load: runs once at start; loads persistent memory + historical retrieval.
+    context_save: runs at graph end (after terminate=True); persists the completed run.
+    """
     graph = StateGraph(AgentState)
 
+    graph.add_node("context_load", context_load_node)
     graph.add_node("planner", planner_node)
     graph.add_node("forecaster", forecaster_node)
     graph.add_node("evaluator", evaluator_node)
     graph.add_node("learner", learner_node)
+    graph.add_node("context_save", context_save_node)
 
-    graph.add_edge(START, "planner")
+    graph.add_edge(START, "context_load")
+    graph.add_edge("context_load", "planner")
     graph.add_edge("planner", "forecaster")
     graph.add_edge("forecaster", "evaluator")
     graph.add_edge("evaluator", "learner")
-    graph.add_conditional_edges("learner", should_continue)
+    graph.add_conditional_edges(
+        "learner",
+        should_continue,
+        {
+            "planner": "planner",
+            END: "context_save",
+        },
+    )
+    graph.add_edge("context_save", END)
 
     return graph.compile()
 
@@ -66,6 +90,7 @@ def run_forecasting_agent(
     actuals: dict[str, list[float]] | None = None,
     max_cycles: int = 5,
     learner_policy: str = "rule_based",
+    customer_id: str | None = None,
     verbose: bool = True,
 ) -> dict[str, Any]:
     """
@@ -77,6 +102,8 @@ def run_forecasting_agent(
                      If None, uses pseudo-actuals from the tail of training data.
         max_cycles:  Maximum number of plan→forecast→eval→learn iterations
         learner_policy: Policy for strategy adaptation ("rule_based", "bandit")
+        customer_id: Optional customer identifier for scoping persistent memory.
+                     Defaults to "default" inside the memory store.
         verbose:     Print cycle summaries
 
     Returns:
@@ -88,6 +115,8 @@ def run_forecasting_agent(
         "cycle_id": str(uuid.uuid4())[:8],
         "series_data": series_df.to_dict(as_series=False),
         "actuals": actuals,
+        "customer_id": customer_id,
+        "memory_context": None,
         "strategy": None,
         "forecasts": [],
         "eval_report": None,
