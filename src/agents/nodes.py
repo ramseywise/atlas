@@ -14,13 +14,22 @@ import logging
 import math
 import os
 import uuid
-from datetime import date
+from datetime import UTC, date
 from typing import Any
 
 import numpy as np
 import polars as pl
 
 from evals.graders.graders import EvalHarness
+from src.agents.context.memory import (
+    EpisodicEntry,
+    append_episodic,
+    format_memory_context,
+    load_memory,
+    save_memory,
+    update_semantic,
+)
+from src.agents.context.retrieval import format_retrieval_context, retrieve_historical_forecasts
 from src.agents.learner.bandit import BanditPolicy
 from src.agents.learner.base import LearnerPolicy
 from src.agents.learner.rule_based import RuleBasedPolicy
@@ -52,6 +61,102 @@ HORIZON_DAYS: dict[ForecastHorizon, int] = {
 }
 
 
+# ── Context Load Node ─────────────────────────────────────────────────────────
+# Priority order (agent-context.md §2):
+#   static (system prompt) → memory → retrieved history → tool results → scratch
+# This node fills the "memory" and "retrieved history" slots before the planner runs.
+
+
+def context_load_node(state: AgentState) -> dict[str, Any]:
+    """
+    Load persistent memory and retrieve relevant historical forecasts.
+
+    Runs before the planner on every cycle. On cycle 0, seeds memory_context
+    from the store; on subsequent cycles the context is already in state (no
+    re-load needed — state carries it across nodes within a run).
+    """
+    # Only load from disk on the first cycle to avoid redundant I/O
+    if state.get("cycle_count", 0) > 0:
+        return {}
+
+    customer_id = state.get("customer_id")
+    store = load_memory(customer_id)
+
+    # Episodic + semantic summaries
+    ctx = format_memory_context(store, max_episodes=3)
+
+    # Historical retrieval: last 5 passing runs for any horizon (compressed context)
+    recent_entries = retrieve_historical_forecasts(
+        customer_id=customer_id, passed_only=False, limit=5
+    )
+    ctx["retrieved_history"] = format_retrieval_context(recent_entries)
+
+    logger.debug(
+        "context.load customer_id=%s total_runs=%d",
+        customer_id,
+        ctx.get("total_runs", 0),
+    )
+    return {"memory_context": ctx}
+
+
+# ── Context Save Node ─────────────────────────────────────────────────────────
+# Runs after learner_node (session end). Writes episodic + semantic to disk.
+
+
+def context_save_node(state: AgentState) -> dict[str, Any]:
+    """
+    Persist the completed run to the memory store.
+
+    Writes:
+      - One EpisodicEntry (append-only)
+      - Updated SemanticFacts (best strategy per horizon)
+
+    Returns empty dict — no state mutation needed after save.
+    """
+    report: EvalReport | None = state.get("eval_report")
+    strategy: PlannerStrategy | None = state.get("strategy")
+    feedback: LearnerFeedback | None = state.get("learner_feedback")
+
+    if report is None or strategy is None:
+        logger.debug("context.save.skipped — no report or strategy in final state")
+        return {}
+
+    customer_id = state.get("customer_id")
+    store = load_memory(customer_id)
+
+    from datetime import datetime
+
+    entry = EpisodicEntry(
+        run_id=state.get("cycle_id", "unknown"),
+        timestamp=datetime.now(tz=UTC).isoformat(),
+        cycle_count=state.get("cycle_count", 0),
+        overall_mase=report.overall_mase,
+        overall_smape=report.overall_smape,
+        drift_detected=report.drift_ratio > 1.2,
+        strategy_variant=strategy.model_variant.value,
+        horizon=strategy.horizon.value,
+        all_passed=report.all_passed,
+        reflection=feedback.reflection_text[:200] if feedback else "",
+    )
+
+    append_episodic(store, entry)
+    update_semantic(
+        store,
+        horizon=strategy.horizon.value,
+        model_variant=strategy.model_variant.value,
+        mase=report.overall_mase,
+        drift_detected=entry.drift_detected,
+    )
+    save_memory(store)
+
+    logger.debug(
+        "context.save customer_id=%s episodes=%d",
+        customer_id,
+        len(store.episodic),
+    )
+    return {}
+
+
 # ── Planner Node ──────────────────────────────────────────────────────────────
 
 
@@ -59,8 +164,11 @@ def planner_node(state: AgentState) -> dict[str, Any]:
     """
     Selects forecast horizon, model variant, and feature flags.
 
-    On cycle 0: uses defaults.
+    On cycle 0: uses defaults, optionally seeded from memory context.
     On subsequent cycles: incorporates feedback from the previous Learner output.
+
+    Context priority (agent-context.md §2):
+      memory best_strategy_hint → default fallback
     """
     feedback: LearnerFeedback | None = state.get("learner_feedback")
 
@@ -68,12 +176,28 @@ def planner_node(state: AgentState) -> dict[str, Any]:
         # Adopt the updated strategy from the Learner
         strategy = feedback.updated_strategy
     else:
-        # First cycle defaults
+        # First cycle: seed model_variant from memory if available
+        memory_ctx: dict | None = state.get("memory_context")
+        hint_variant: str | None = memory_ctx.get("best_strategy_hint") if memory_ctx else None
+
+        # Resolve hint to ModelVariant enum (fall back to CHRONOS_TINY if unknown)
+        try:
+            model_variant = (
+                ModelVariant(hint_variant) if hint_variant else ModelVariant.CHRONOS_TINY
+            )
+        except ValueError:
+            model_variant = ModelVariant.CHRONOS_TINY
+
+        rationale = (
+            f"Memory-seeded initial strategy: {hint_variant}"
+            if hint_variant
+            else "Initial default strategy — no prior feedback"
+        )
         strategy = PlannerStrategy(
             horizon=ForecastHorizon.MONTH,
-            model_variant=ModelVariant.CHRONOS_TINY,
+            model_variant=model_variant,
             context_multiplier=3.0,
-            rationale="Initial default strategy — no prior feedback",
+            rationale=rationale,
         )
 
     return {"strategy": strategy, "strategy_history": [strategy]}
