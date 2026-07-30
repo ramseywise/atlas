@@ -1,6 +1,6 @@
 include ~/.claude/Makefile.common
 
-.PHONY: test test-fast test-core test-graders test-arima test-smoke test-features test-segment test-segment-smoke test-crypto test-learner lint format run forecast segment crypto crypto-monitor compare compare-learner clean
+.PHONY: test test-fast test-core test-graders test-arima test-smoke test-features test-segment test-segment-smoke test-crypto test-learner eval lint format run forecast segment crypto crypto-monitor compare compare-learner clean
 
 # ── Test targets ──────────────────────────────────────────────────────────────
 
@@ -15,6 +15,9 @@ test-core:
 
 test-graders:
 	uv run pytest tests/evals/test_graders.py -v
+
+eval:
+	uv run pytest tests/evals/ -v -s
 
 test-arima:
 	uv run pytest tests/core/test_arima.py -v
