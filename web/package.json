@@ -10,24 +10,24 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.21",
-    "ai": "^7.0.37",
+    "@ai-sdk/anthropic": "^4.0.23",
+    "ai": "^7.0.41",
     "clsx": "^2.1.1",
-    "next": "^16.2.11",
+    "next": "^16.2.12",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "recharts": "^3.10.0",
+    "recharts": "^3.10.1",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
-"@types/node": "^26.1.1",
+"@types/node": "^26.1.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.20",
-    "eslint": "^9.27.0",
-    "eslint-config-next": "^16.2.11",
-    "postcss": "^8.5.23",
+    "eslint": "^10.8.0",
+    "eslint-config-next": "^16.2.12",
+    "postcss": "^8.5.24",
     "tailwindcss": "^4.3.3",
-    "typescript": "~6.0.3"
+    "typescript": "~7.0.2"
   }
 }
