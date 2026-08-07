@@ -31,6 +31,7 @@ dependencies = [
 
     # Reporting
     "rich>=13.0.0",
+    "matplotlib>=3.9.0",      # evals/reports/figures.py SVG panels
 
     # HTTP
     "httpx>=0.27.0",
