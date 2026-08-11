@@ -118,12 +118,11 @@ def build_eval_report(
             Omit for a single-cycle report.
     """
     from evals.reports.eval_figures import (
-        fig_cycle_history,
         fig_error_by_horizon,
         fig_forecast_panels,
         fig_margin_to_threshold,
-        fig_series_heatmap,
     )
+    from evals.reports.history_figures import fig_cycle_history, fig_series_heatmap
 
     subdir = f"eval/{report.cycle_id}"
     out_dir = OUTPUT_ROOT / "eval" / report.cycle_id
