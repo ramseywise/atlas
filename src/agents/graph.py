@@ -11,9 +11,12 @@ The learner decides whether to continue cycling or terminate based on:
 
 from __future__ import annotations
 
+import logging
 import uuid
+from pathlib import Path
 from typing import Any, Literal
 
+import numpy as np
 import polars as pl
 from langgraph.graph import END, START, StateGraph
 
@@ -26,6 +29,8 @@ from src.agents.nodes import (
     planner_node,
 )
 from src.agents.state import AgentState
+
+logger = logging.getLogger(__name__)
 
 # ── Routing ───────────────────────────────────────────────────────────────────
 
@@ -92,6 +97,7 @@ def run_forecasting_agent(
     learner_policy: str = "rule_based",
     customer_id: str | None = None,
     verbose: bool = True,
+    write_report: bool = False,
 ) -> dict[str, Any]:
     """
     Run the full forecasting agent loop.
@@ -105,6 +111,9 @@ def run_forecasting_agent(
         customer_id: Optional customer identifier for scoping persistent memory.
                      Defaults to "default" inside the memory store.
         verbose:     Print cycle summaries
+        write_report: Write the HTML eval dashboard for the final cycle to
+                     evals/reports/output/eval/<cycle_id>/. Off by default —
+                     a graph run should not touch the filesystem unless asked.
 
     Returns:
         Final AgentState as a dict
@@ -136,7 +145,57 @@ def run_forecasting_agent(
     if verbose:
         _print_run_summary(final_state)
 
+    if write_report:
+        path = _write_eval_report(final_state)
+        if verbose and path:
+            logger.info("Eval dashboard written to %s", path)
+
     return final_state
+
+
+def _write_eval_report(state: dict[str, Any]) -> Path | None:
+    """
+    Render the HTML eval dashboard for the run's final cycle.
+
+    Rebuilds the actuals and pre-cutoff history from final state so the forecast
+    panels can overlay what the graders actually scored against — a report drawn
+    without them shows a forecast with nothing to check it against.
+
+    Returns the written path, or None if the run produced no eval report.
+    """
+    from evals.reports.report import build_eval_report
+
+    report = state.get("eval_report")
+    if report is None:
+        return None
+
+    forecasts = state.get("forecasts") or []
+    series_data = pl.from_dict(state["series_data"])
+    horizon_days = len(forecasts[0].point_forecast) if forecasts else 0
+
+    actuals_raw = state.get("actuals")
+    actuals_map: dict[str, np.ndarray] = {}
+    history_map: dict[str, np.ndarray] = {}
+
+    for sid in series_data["series_id"].unique().to_list():
+        values = series_data.filter(pl.col("series_id") == sid).sort("date")["value"].to_numpy()
+        # Mirrors evaluator_node: provided actuals when present, else the tail of
+        # the series as pseudo-actuals, with everything before it as history.
+        if actuals_raw and sid in actuals_raw:
+            actuals_map[sid] = np.asarray(actuals_raw[sid], dtype=float)
+            history_map[sid] = values
+        elif horizon_days:
+            actuals_map[sid] = values[-horizon_days:]
+            history_map[sid] = values[:-horizon_days]
+
+    history = state.get("eval_history") or []
+    return build_eval_report(
+        report,
+        forecasts,
+        actuals_map,
+        history_map,
+        history=history[:-1],  # the final cycle is `report` itself
+    )
 
 
 def _print_run_summary(state: dict[str, Any]) -> None:

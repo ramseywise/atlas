@@ -93,6 +93,10 @@ class GraderScore(BaseModel):
     threshold: float
     passed: bool
     detail: str = ""
+    lower_is_better: bool = True  # direction of the threshold comparison
+    # Per-horizon-step values, index 0 = one step ahead. Empty when the grader
+    # is not decomposable by step (e.g. drift, which is cycle-level).
+    per_step: list[float] = Field(default_factory=list)
 
 
 class EvalReport(BaseModel):
@@ -108,6 +112,9 @@ class EvalReport(BaseModel):
     drift_ratio: float  # current MASE / rolling baseline MASE
     all_passed: bool
     summary: str = ""
+    # Mean 80% PI width normalised by the actual level, averaged over series.
+    # Coverage alone is gameable by widening intervals; this makes that visible.
+    interval_width: float = float("nan")
 
 
 class LearnerFeedback(BaseModel):
