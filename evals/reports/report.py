@@ -3,8 +3,12 @@
 Usage:
     from evals.reports.report import build_eval_report, build_segment_report
 
-    # Forecast + eval cycle
-    build_eval_report(eval_report, forecast_results, actuals_map)
+    # Forecast + eval cycle. actuals_map is the same actuals_by_series mapping
+    # passed to EvalHarness.run — without it the panels cannot show what the
+    # graders scored against. history_map/history are optional context.
+    build_eval_report(
+        eval_report, forecast_results, actuals_map, history_map, history=prior_reports
+    )
 
     # Segmentation run
     build_segment_report(seg_eval, X_2d, labels, segment_names)
@@ -92,45 +96,83 @@ def build_eval_report(
     report: EvalReport,
     forecast_results: list[ForecastResult] | None = None,
     actuals_map: dict[str, np.ndarray] | None = None,
+    history_map: dict[str, np.ndarray] | None = None,
+    history: list[EvalReport] | None = None,
     *,
     output_path: Path | None = None,
 ) -> Path:
-    """HTML eval report: grader pass rates + forecast grid + summary stats."""
-    from evals.reports.figures import (
-        fig_forecast_grid,
-        fig_grader_pass_rates,
+    """
+    HTML eval dashboard for one cycle.
+
+    Args:
+        report: the cycle's EvalReport.
+        forecast_results: forecasts to draw panels for.
+        actuals_map: series_id -> holdout actuals over the forecast window. This
+            is the same mapping passed to EvalHarness.run as actuals_by_series —
+            the values the graders scored against. Without it the panels show a
+            forecast with nothing to check it against, which was the central
+            defect of the previous report.
+        history_map: series_id -> pre-cutoff history, for context to the left of
+            the forecast window. Optional.
+        history: prior EvalReports (oldest first) for the cycle-history panel.
+            Omit for a single-cycle report.
+    """
+    from evals.reports.eval_figures import (
+        fig_cycle_history,
+        fig_error_by_horizon,
+        fig_forecast_panels,
+        fig_margin_to_threshold,
+        fig_series_heatmap,
     )
 
     subdir = f"eval/{report.cycle_id}"
     out_dir = OUTPUT_ROOT / "eval" / report.cycle_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    grader_svg = fig_grader_pass_rates(report, subdir=subdir)
+    margin_svg = fig_margin_to_threshold(report, subdir=subdir)
+    heatmap_svg = fig_series_heatmap(report, subdir=subdir)
+
+    has_per_step = any(s.per_step for scores in report.series_scores.values() for s in scores)
+    horizon_svg = fig_error_by_horizon(report, subdir=subdir) if has_per_step else None
+
     forecast_svg = None
     if forecast_results:
-        forecast_svg = fig_forecast_grid(forecast_results, actuals_map, subdir=subdir)
+        forecast_svg = fig_forecast_panels(
+            forecast_results,
+            actuals_map,
+            history_map,
+            subdir=subdir,
+        )
+
+    all_cycles = [*(history or []), report]
+    history_svg = fig_cycle_history(all_cycles, subdir=subdir) if len(all_cycles) > 1 else None
 
     status = "PASS" if report.all_passed else "FAIL"
     badge_cls = "pass" if report.all_passed else "fail"
     n_series = len(report.series_scores)
     n_passed = sum(1 for scores in report.series_scores.values() if all(s.passed for s in scores))
 
+    width_stat = (
+        _stat(f"{report.interval_width:.1f}%", "80% PI width", "≤ 40% warning")
+        if not np.isnan(report.interval_width)
+        else ""
+    )
     stats_row = "".join(
         [
             _stat(f"{report.overall_mase:.3f}", "MASE", "< 1.0 to pass"),
             _stat(f"{report.overall_smape:.1f}%", "SMAPE", "< 15% to pass"),
             _stat(f"{report.directional_accuracy:.1f}%", "Directional", "> 55% to pass"),
             _stat(f"{report.coverage_80:.1f}%", "80% PI Coverage", "≥ 75% to pass"),
+            width_stat,
             _stat(f"{report.drift_ratio:.3f}", "Drift ratio", "< 1.2 warning"),
         ]
     )
 
-    forecast_section = ""
-    if forecast_svg:
-        forecast_section = f"""
-<h2>Forecast — {n_series} series</h2>
-{_card(_read_svg(forecast_svg))}
-"""
+    def _section(heading: str, svg_path: Path | None, note: str = "") -> str:
+        if not svg_path:
+            return ""
+        note_html = f'<p class="lead">{_html.escape(note)}</p>' if note else ""
+        return f"<h2>{_html.escape(heading)}</h2>\n{note_html}\n{_card(_read_svg(svg_path))}\n"
 
     summary_section = ""
     if report.summary:
@@ -144,9 +186,12 @@ def build_eval_report(
 
 <h2>Grader Metrics</h2>
 <div class="grid3">{stats_row}</div>
-{_card(_read_svg(grader_svg))}
+{_card(_read_svg(margin_svg))}
 
-{forecast_section}
+{_section("Per-series breakdown", heatmap_svg, "Cycle metrics are means across series — this shows what the mean hides.")}
+{_section("Error by horizon step", horizon_svg, "Degradation with distance: mean-reversion shows as MASE climbing and direction sliding toward 50%.")}
+{_section(f"Forecast vs actuals — {n_series} series", forecast_svg, "Shaded regions are actuals that fell outside the 80% interval.")}
+{_section("Cycle history", history_svg, "Each panel is one metric across cycles, on its own scale, with its own gate.")}
 {summary_section}
 """
 
