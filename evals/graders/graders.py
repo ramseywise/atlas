@@ -24,6 +24,7 @@ from evals.metrics.constants import (
     DEFAULT_COVERAGE_THRESHOLD,
     DEFAULT_DIRECTIONAL_THRESHOLD,
     DEFAULT_DRIFT_THRESHOLD,
+    DEFAULT_INTERVAL_WIDTH_THRESHOLD,
     DEFAULT_MASE_THRESHOLD,
     DEFAULT_SMAPE_THRESHOLD,
 )
@@ -39,13 +40,23 @@ class BaseGrader(ABC):
     @abstractmethod
     def score(self, actuals: np.ndarray, forecast: ForecastResult) -> GraderScore: ...
 
-    def _make_score(self, value: float, detail: str = "") -> GraderScore:
+    #: Direction of the threshold comparison; overridden by higher-is-better graders.
+    lower_is_better: bool = True
+
+    def _make_score(
+        self,
+        value: float,
+        detail: str = "",
+        per_step: list[float] | None = None,
+    ) -> GraderScore:
         return GraderScore(
             grader_name=self.name,
             metric_value=round(value, 4),
             threshold=self.threshold,
             passed=self._passes(value),
             detail=detail,
+            lower_is_better=self.lower_is_better,
+            per_step=[round(v, 4) for v in (per_step or [])],
         )
 
     def _passes(self, value: float) -> bool:
@@ -74,9 +85,16 @@ class MASEGrader(BaseGrader):
 
     def score(self, actuals: np.ndarray, forecast: ForecastResult) -> GraderScore:
         preds = np.array(forecast.point_forecast[: len(actuals)])
-        mae = np.mean(np.abs(actuals - preds))
+        abs_err = np.abs(actuals - preds)
+        mae = np.mean(abs_err)
         mase = mae / self.naive_mae
-        return self._make_score(mase, f"MAE={mae:.2f}, naive_MAE={self.naive_mae:.2f}")
+        # Scaled error at each horizon step — reveals degradation with distance.
+        per_step = (abs_err / self.naive_mae).tolist()
+        return self._make_score(
+            mase,
+            f"MAE={mae:.2f}, naive_MAE={self.naive_mae:.2f}",
+            per_step=per_step,
+        )
 
 
 # ── SMAPE ─────────────────────────────────────────────────────────────────────
@@ -95,8 +113,9 @@ class SMAPEGrader(BaseGrader):
             1e-8,
             (np.abs(actuals) + np.abs(preds)) / 2,
         )
-        smape = 100.0 * np.mean(np.abs(actuals - preds) / denom)
-        return self._make_score(smape, f"SMAPE={smape:.2f}%")
+        per_step_err = 100.0 * (np.abs(actuals - preds) / denom)
+        smape = float(np.mean(per_step_err))
+        return self._make_score(smape, f"SMAPE={smape:.2f}%", per_step=per_step_err.tolist())
 
 
 # ── Directional Accuracy ──────────────────────────────────────────────────────
@@ -107,6 +126,7 @@ class DirectionalGrader(BaseGrader):
 
     name = "DirectionalAccuracy"
     threshold = DEFAULT_DIRECTIONAL_THRESHOLD
+    lower_is_better = False
 
     def _passes(self, value: float) -> bool:
         return value > self.threshold
@@ -115,8 +135,15 @@ class DirectionalGrader(BaseGrader):
         preds = np.array(forecast.point_forecast[: len(actuals)])
         if len(actuals) < 2:
             return self._make_score(50.0, "Too few steps")
-        accuracy = 100.0 * np.mean(np.sign(np.diff(actuals)) == np.sign(np.diff(preds)))
-        return self._make_score(accuracy, f"Correct direction on {accuracy:.1f}% of steps")
+        hits = np.sign(np.diff(actuals)) == np.sign(np.diff(preds))
+        accuracy = 100.0 * float(np.mean(hits))
+        # 100/0 per step; averaged across series this becomes an accuracy-by-horizon
+        # curve, which is where mean-reversion at long horizons shows up.
+        return self._make_score(
+            accuracy,
+            f"Correct direction on {accuracy:.1f}% of steps",
+            per_step=(100.0 * hits.astype(float)).tolist(),
+        )
 
 
 # ── Coverage ──────────────────────────────────────────────────────────────────
@@ -127,6 +154,7 @@ class CoverageGrader(BaseGrader):
 
     name = "Coverage80"
     threshold = DEFAULT_COVERAGE_THRESHOLD
+    lower_is_better = False
 
     def _passes(self, value: float) -> bool:
         return value >= self.threshold
@@ -135,8 +163,41 @@ class CoverageGrader(BaseGrader):
         lower = np.array(forecast.lower_80[: len(actuals)])
         upper = np.array(forecast.upper_80[: len(actuals)])
         in_interval = (actuals >= lower) & (actuals <= upper)
-        coverage = 100.0 * np.mean(in_interval)
-        return self._make_score(coverage, f"{int(np.sum(in_interval))}/{len(actuals)} in 80% PI")
+        coverage = 100.0 * float(np.mean(in_interval))
+        return self._make_score(
+            coverage,
+            f"{int(np.sum(in_interval))}/{len(actuals)} in 80% PI",
+            per_step=(100.0 * in_interval.astype(float)).tolist(),
+        )
+
+
+# ── Interval width ────────────────────────────────────────────────────────────
+
+
+class IntervalWidthGrader(BaseGrader):
+    """
+    Mean 80% PI width as a % of the actual level (a.k.a. normalised interval score
+    component). Coverage alone is trivially gamed by widening intervals — a model
+    predicting ±∞ scores 100% coverage. This makes that trade-off visible.
+
+    Warning-only, like drift: a wide interval is not a hard failure if the point
+    forecast is accurate, but it should never widen silently.
+    """
+
+    name = "IntervalWidth"
+    threshold = DEFAULT_INTERVAL_WIDTH_THRESHOLD
+
+    def score(self, actuals: np.ndarray, forecast: ForecastResult) -> GraderScore:
+        lower = np.array(forecast.lower_80[: len(actuals)])
+        upper = np.array(forecast.upper_80[: len(actuals)])
+        denom = np.where(np.abs(actuals) < 1e-8, 1e-8, np.abs(actuals))
+        per_step_width = 100.0 * ((upper - lower) / denom)
+        width = float(np.mean(per_step_width))
+        return self._make_score(
+            width,
+            f"mean 80% PI width = {width:.1f}% of level",
+            per_step=per_step_width.tolist(),
+        )
 
 
 # ── Drift ─────────────────────────────────────────────────────────────────────
@@ -197,6 +258,7 @@ class EvalHarness:
         self._smape_g = SMAPEGrader()
         self._dir_g = DirectionalGrader()
         self._cov_g = CoverageGrader()
+        self._width_g = IntervalWidthGrader()
 
     def run(
         self,
@@ -206,7 +268,7 @@ class EvalHarness:
         actuals_by_series: dict[str, np.ndarray],
     ) -> EvalReport:
         series_scores: dict[str, list[GraderScore]] = {}
-        all_mase, all_smape, all_dir, all_cov = [], [], [], []
+        all_mase, all_smape, all_dir, all_cov, all_width = [], [], [], [], []
 
         for fc in forecasts:
             sid = fc.series_id
@@ -225,17 +287,20 @@ class EvalHarness:
             smape_score = self._smape_g.score(actuals, fc)
             dir_score = self._dir_g.score(actuals, fc)
             cov_score = self._cov_g.score(actuals, fc)
-            scores.extend([smape_score, dir_score, cov_score])
+            width_score = self._width_g.score(actuals, fc)
+            scores.extend([smape_score, dir_score, cov_score, width_score])
 
             all_smape.append(smape_score.metric_value)
             all_dir.append(dir_score.metric_value)
             all_cov.append(cov_score.metric_value)
+            all_width.append(width_score.metric_value)
             series_scores[sid] = scores
 
         overall_mase = float(np.mean(all_mase)) if all_mase else float("nan")
         overall_smape = float(np.mean(all_smape)) if all_smape else float("nan")
         dir_acc = float(np.mean(all_dir)) if all_dir else float("nan")
         cov = float(np.mean(all_cov)) if all_cov else float("nan")
+        width = float(np.mean(all_width)) if all_width else float("nan")
 
         if not math.isnan(overall_mase):
             self._drift_grader.update(overall_mase)
@@ -244,11 +309,13 @@ class EvalHarness:
         for sid in series_scores:
             series_scores[sid].append(drift_score)
 
+        # Drift and interval width are warning-only signals, not hard gates.
+        advisory = {"DriftDetection", "IntervalWidth"}
         all_passed = all(
             s.passed
             for scores in series_scores.values()
             for s in scores
-            if s.grader_name != "DriftDetection"
+            if s.grader_name not in advisory
         )
 
         return EvalReport(
@@ -261,12 +328,15 @@ class EvalHarness:
             coverage_80=round(cov, 4),
             drift_ratio=round(drift_score.metric_value, 4),
             all_passed=all_passed,
-            summary=_summarise(overall_mase, overall_smape, dir_acc, cov, drift_score),
+            interval_width=round(width, 4),
+            summary=_summarise(overall_mase, overall_smape, dir_acc, cov, width, drift_score),
         )
 
 
-def _summarise(mase, smape, dir_acc, cov, drift_score) -> str:
+def _summarise(mase, smape, dir_acc, cov, width, drift_score) -> str:
     drift_flag = " ⚠ DRIFT" if not drift_score.passed else ""
+    width_str = "" if math.isnan(width) else f" | PIw={width:.1f}%"
     return (
-        f"MASE={mase:.3f} | SMAPE={smape:.1f}% | Dir={dir_acc:.1f}% | Cov80={cov:.1f}%{drift_flag}"
+        f"MASE={mase:.3f} | SMAPE={smape:.1f}% | Dir={dir_acc:.1f}% "
+        f"| Cov80={cov:.1f}%{width_str}{drift_flag}"
     )

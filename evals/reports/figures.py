@@ -1,7 +1,10 @@
 """Atlas eval figures — matplotlib → SVG for embedding in HTML reports.
 
 Usage:
-    from evals.reports.figures import fig_forecast, fig_grader_pass_rates, fig_segments_scatter
+    from evals.reports.figures import fig_forecast, fig_eval_history, fig_segments_scatter
+
+Eval-cycle dashboard figures live in evals/reports/eval_figures.py; this module
+holds single-series forecast plots, history, and the segmentation figures.
 
 Each function returns a Path to the written SVG and accepts the relevant
 data types from src/agents/state.py and core/segmentation/evaluation.py.
@@ -108,103 +111,6 @@ def fig_forecast(
     ax.legend(fontsize=9, framealpha=0.9)
     fig.tight_layout()
     return _save(fig, f"forecast_{result.series_id}", subdir)
-
-
-def fig_forecast_grid(
-    results: list[ForecastResult],
-    actuals_map: dict[str, np.ndarray] | None = None,
-    *,
-    ncols: int = 2,
-    subdir: str = "",
-) -> Path:
-    """Grid of forecast panels, one per series."""
-    n = len(results)
-    nrows = (n + ncols - 1) // ncols
-    fig, axes = plt.subplots(nrows, ncols, figsize=(7 * ncols, 3.5 * nrows))
-    _style()
-    axes_flat = np.atleast_1d(axes).flatten()
-    am = actuals_map or {}
-
-    for ax, r in zip(axes_flat, results, strict=False):
-        actuals = am.get(r.series_id)
-        x_forecast = np.arange(r.forecast_steps)
-        if actuals is not None and len(actuals):
-            x_hist = np.arange(-len(actuals), 0)
-            ax.plot(x_hist, actuals, color=NAVY, linewidth=1.5)
-            ax.axvline(-0.5, color=SLATE, linewidth=0.8, linestyle="--")
-        lo, hi, pt = np.array(r.lower_80), np.array(r.upper_80), np.array(r.point_forecast)
-        ax.fill_between(x_forecast, lo, hi, color=TEAL, alpha=0.18)
-        ax.plot(x_forecast, pt, color=TEAL, linewidth=1.8, marker="o", markersize=2)
-        ax.set_title(f"{r.series_id}", fontsize=9, color=NAVY, fontweight="bold")
-        ax.tick_params(labelsize=8)
-
-    for ax in axes_flat[n:]:
-        ax.set_visible(False)
-
-    fig.suptitle("Forecast Grid", fontsize=12, color=NAVY, fontweight="bold")
-    fig.tight_layout()
-    return _save(fig, "forecast_grid", subdir)
-
-
-# ── Eval graders ─────────────────────────────────────────────────────────────
-
-
-def fig_grader_pass_rates(report: EvalReport, *, subdir: str = "") -> Path:
-    """Pass/fail bar for each grader metric in an EvalReport."""
-    metrics = [
-        ("MASE", report.overall_mase, 1.0, True),  # lower better
-        ("SMAPE %", report.overall_smape, 15.0, True),
-        ("Directional", report.directional_accuracy, 55.0, False),  # higher better
-        ("Coverage 80", report.coverage_80, 75.0, False),
-        ("Drift ratio", report.drift_ratio, 1.2, True),
-    ]
-
-    labels = [m[0] for m in metrics]
-    values = [m[1] for m in metrics]
-    thresholds = [m[2] for m in metrics]
-    lower_better = [m[3] for m in metrics]
-
-    colors = [
-        GREEN if (v <= t if lb else v >= t) else RED
-        for v, t, lb in zip(values, thresholds, lower_better, strict=False)
-    ]
-
-    x = np.arange(len(labels))
-    fig, ax = plt.subplots(figsize=(8, 4))
-    _style()
-    ax.yaxis.grid(True, color=SLATE, zorder=0)
-    ax.xaxis.grid(False)
-
-    bars = ax.bar(x, values, color=colors, width=0.55, zorder=3)
-    ax.plot(
-        x, thresholds, "o--", color=NAVY, linewidth=1.5, markersize=5, zorder=4, label="Threshold"
-    )
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels, fontsize=10)
-    ax.set_ylabel("Value")
-    ax.legend(fontsize=8, framealpha=0.9)
-
-    for bar, val in zip(bars, values, strict=False):
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + 0.02 * ax.get_ylim()[1],
-            f"{val:.3f}",
-            ha="center",
-            va="bottom",
-            fontsize=9,
-            color=NAVY,
-            fontweight="bold",
-        )
-
-    status = "PASS" if report.all_passed else "FAIL"
-    status_color = GREEN if report.all_passed else RED
-    ax.set_title(
-        f"Eval Report — {report.cycle_id}  [{status}]\n{report.forecast_date}",
-        fontsize=11,
-        color=status_color,
-    )
-    fig.tight_layout()
-    return _save(fig, f"grader_pass_rates_{report.cycle_id}", subdir)
 
 
 def fig_eval_history(
