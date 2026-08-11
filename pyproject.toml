@@ -5,7 +5,7 @@ description = "Cash flow forecasting and customer segmentation agent"
 requires-python = ">=3.12"
 dependencies = [
     # Core data
-    "polars>=1.43.1",
+    "polars>=1.43.2",
     "numpy>=2.5.1",
     "pandas>=2.0.0",          # statsforecast requires pandas
 
@@ -51,14 +51,14 @@ tsfresh = [
 dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=0.23.0",
-    "ruff>=0.16.0",
+    "ruff>=0.16.1",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=0.23.0",
-    "ruff>=0.16.0",
+    "ruff>=0.16.1",
 ]
 
 [tool.pytest.ini_options]
