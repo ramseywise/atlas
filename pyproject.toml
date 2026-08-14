@@ -6,7 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     # Core data
     "polars>=1.43.2",
-    "numpy>=2.5.1",
+    "numpy>=2.5.2",
     "pandas>=2.0.0",          # statsforecast requires pandas
 
     # ML / forecasting
@@ -19,7 +19,7 @@ dependencies = [
     "hdbscan>=0.8.44",
 
     # LangGraph / Anthropic
-    "langgraph>=1.2.10",
+    "langgraph>=1.2.11",
     "anthropic>=0.121.0",
 
     # Knowledge graph
@@ -37,7 +37,7 @@ dependencies = [
     "httpx>=0.27.0",
 
     # Crypto
-    "ccxt>=4.5.69",
+    "ccxt>=4.5.73",
 ]
 
 [project.optional-dependencies]
@@ -46,7 +46,7 @@ chronos = [
     "chronos-forecasting>=2.3.1",
 ]
 tsfresh = [
-    "tsfresh>=0.20.0",
+    "tsfresh>=0.21.2",
 ]
 dev = [
     "pytest>=9.1.1",
