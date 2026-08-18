@@ -7,7 +7,7 @@ dependencies = [
     # Core data
     "polars>=1.43.2",
     "numpy>=2.5.2",
-    "pandas>=2.0.0",          # statsforecast requires pandas
+    "pandas>=3.0.5",          # statsforecast requires pandas
 
     # ML / forecasting
     "scikit-learn>=1.9.0",
