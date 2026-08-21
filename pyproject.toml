@@ -20,7 +20,7 @@ dependencies = [
 
     # LangGraph / Anthropic
     "langgraph>=1.2.11",
-    "anthropic>=0.121.0",
+    "anthropic>=0.122.0",
 
     # Knowledge graph
     "neo4j>=5.0.0",
@@ -37,7 +37,7 @@ dependencies = [
     "httpx>=0.27.0",
 
     # Crypto
-    "ccxt>=4.5.73",
+    "ccxt>=4.5.74",
 ]
 
 [project.optional-dependencies]
@@ -51,14 +51,14 @@ tsfresh = [
 dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=0.23.0",
-    "ruff>=0.16.2",
+    "ruff>=0.16.3",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=0.23.0",
-    "ruff>=0.16.2",
+    "ruff>=0.16.3",
 ]
 
 [tool.pytest.ini_options]
