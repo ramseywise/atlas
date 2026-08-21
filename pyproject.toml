@@ -27,7 +27,7 @@ dependencies = [
 
     # API
     "fastapi>=0.141.1",
-    "uvicorn[standard]>=0.52.1",
+    "uvicorn[standard]>=0.52.3",
 
     # Reporting
     "rich>=13.0.0",
