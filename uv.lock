@@ -275,7 +275,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=0.121.0" },
-    { name = "ccxt", specifier = ">=4.5.76" },
+    { name = "ccxt", specifier = ">=4.5.77" },
     { name = "chronos-forecasting", marker = "extra == 'chronos'", specifier = ">=2.3.1" },
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "hdbscan", specifier = ">=0.8.44" },
@@ -318,7 +318,7 @@ wheels = [
 
 [[package]]
 name = "ccxt"
-version = "4.5.76"
+version = "4.5.77"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohappyeyeballs" },
@@ -345,9 +345,9 @@ dependencies = [
     { name = "yarl" },
     { name = "zlib-ng" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/9b/7a0f6405859a25360f969ecdb9ad9f4bc1587cd84e082aa82821d4db0593/ccxt-4.5.76.tar.gz", hash = "sha256:d0c7a8dbe227335cc9e4dd123314e8376e333927fe6b373feafea19fb4f71b76", size = 6139968, upload-time = "2026-08-26T19:50:14.958Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f1/b0/ba609d34268efed1404433d6da881f302f2d47931af145a6c0ec65624ad1/ccxt-4.5.77.tar.gz", hash = "sha256:f3c6e30063d8d6c3d324babf3b33e8cec8b09728ca7bf3d844a68404d844faf5", size = 6195168, upload-time = "2026-09-01T16:03:32.674Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/60/44/93b2c372b6d3c1010c0ab41d8a4c44d3e907ee7c4343ae1c51ed982cd028/ccxt-4.5.76-py3-none-any.whl", hash = "sha256:5dd760133eb7977c64798c202473b29ae1d3b667c4c823601fbc58ae7ff5d099", size = 6584379, upload-time = "2026-08-26T19:50:12.104Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/65/d4a1a8a4aa39420a7954ce815b2aef5e54af5c3e6d4bc6fb359acd5819c9/ccxt-4.5.77-py3-none-any.whl", hash = "sha256:5b016da55093b6101cbcd1224a154a2a58932651150daa006720f58439b6584b", size = 6638814, upload-time = "2026-09-01T16:03:29.924Z" },
 ]
 
 [[package]]
