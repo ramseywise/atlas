@@ -239,7 +239,7 @@ wheels = [
 
 [[package]]
 name = "anthropic"
-version = "1.15.0"
+version = "1.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -251,9 +251,9 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/10/37/5a2a4316df8babd28f096477a707cd75f240b4264c97fb128c32375105d6/anthropic-1.15.0.tar.gz", hash = "sha256:90caa9df83e2fc8bddb4ddeb83b7191bce255f635c03eae055deec521741df08", size = 1726101, upload-time = "2026-10-15T19:45:34.635Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/8f/bff52d760a4c83826c3de67266f2ae7f81bbf63acfe652b125a0854da5dc/anthropic-1.16.0.tar.gz", hash = "sha256:6ccefa92f66717347858e8824f658896fd4fc23a7203bdf8f808d6b0094aa445", size = 1749235, upload-time = "2026-10-20T17:50:12.599Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d1/65/54437e7edea49a3be9ef56f6b5965999bfdc52b9dadc9b448124ca51a594/anthropic-1.15.0-py3-none-any.whl", hash = "sha256:10189a7993c5c71a0a2d4bb80020ca6a2fd27679f51e627405da37251d15ff49", size = 2047755, upload-time = "2026-10-15T19:45:32.951Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/50/b879684f97c59a012162bece705f806c72d0bc120e87111f038b1350afc4/anthropic-1.16.0-py3-none-any.whl", hash = "sha256:f8544b4495c480b4633df223223bfc23d5d78081cb69e5b373010e36857e0fdd", size = 2084452, upload-time = "2026-10-20T17:50:14.68Z" },
 ]
 
 [[package]]
@@ -316,10 +316,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", specifier = ">=1.15.0" },
-    { name = "ccxt", specifier = ">=4.5.78" },
+    { name = "anthropic", specifier = ">=1.16.0" },
+    { name = "ccxt", specifier = ">=4.5.89" },
     { name = "chronos-forecasting", marker = "extra == 'chronos'", specifier = ">=2.3.2" },
-    { name = "fastapi", specifier = ">=0.143.3" },
+    { name = "fastapi", specifier = ">=0.156.2" },
     { name = "hdbscan", specifier = ">=0.8.44" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "langgraph", specifier = ">=1.2.16" },
@@ -360,7 +360,7 @@ wheels = [
 
 [[package]]
 name = "ccxt"
-version = "4.5.88"
+version = "4.5.89"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohappyeyeballs" },
@@ -387,9 +387,9 @@ dependencies = [
     { name = "yarl" },
     { name = "zlib-ng" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ea/0d/33185cbe18cd75afbc21077b62805e31f50998425772869e8a61c5589fd2/ccxt-4.5.88.tar.gz", hash = "sha256:cb615b5f420fd57b2624c4e85a02a1fa32c914fec4fc5ebe7565d1ef06333016", size = 6304659, upload-time = "2026-10-14T10:56:50.946Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/9e/ec3ba01848971d26144bede446868508de250a501a1cb5154cb051cfe175/ccxt-4.5.89.tar.gz", hash = "sha256:1dfd87ecf804d04a60b041effe8ec041a1bb85ef749f067c9c5bd73f7ab77856", size = 6348220, upload-time = "2026-10-20T10:20:30.929Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9e/7a/710fe4ca770ca6d1054786eb430d36344aaea93d1a26b27f7959072d0bb7/ccxt-4.5.88-py3-none-any.whl", hash = "sha256:3e37d626cf3245c547b76751a26a9119df9da28f1f80fbdb751586bfebf5f791", size = 6684043, upload-time = "2026-10-14T10:56:47.731Z" },
+    { url = "https://files.pythonhosted.org/packages/12/2c/6a38413fb0f12531db4effe78325f68e19fb7df778e5dcb470f827ff02f4/ccxt-4.5.89-py3-none-any.whl", hash = "sha256:afe4e59138e3873d48391115302af9e61e8fd52c8f7a56cf690be35751736f7c", size = 6729194, upload-time = "2026-10-20T10:20:28.504Z" },
 ]
 
 [[package]]
@@ -852,7 +852,7 @@ wheels = [
 
 [[package]]
 name = "fastapi"
-version = "0.143.3"
+version = "0.156.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
@@ -862,9 +862,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/38/d5/b0aeb0b303650ac87b0411de4aaf3f901b06042dcc3fb00f30b97b7ff585/fastapi-0.143.3.tar.gz", hash = "sha256:b9ab567ee57afb4454004ce04c889f8f0160ac47946b99795887cd6e88484848", size = 469834, upload-time = "2026-10-16T14:14:13.31Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/11/e3/400f278162f423df77f6a05fa5d51a54b8fafbc032ea902ce612fadb13f7/fastapi-0.156.2.tar.gz", hash = "sha256:6c735592f4842b04d62aa9147aa8f287ac95e293a5257257ca6a405819d4e066", size = 494193, upload-time = "2026-10-20T20:12:14.144Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/1a/03d246befcf307219bb2161c97d8c5d314f84125bf7dd245730a28589828/fastapi-0.143.3-py3-none-any.whl", hash = "sha256:75e8bd68e2f52f77d29b2879749c257d64de2d85282d25270caf2bfccce5efe5", size = 144849, upload-time = "2026-10-16T14:14:11.763Z" },
+    { url = "https://files.pythonhosted.org/packages/88/9d/fdd72314f3b6c52d1da8a75caa90719464d8997501b367edacbef1ee6f08/fastapi-0.156.2-py3-none-any.whl", hash = "sha256:5ccf73cbadf1f74382194e8edd4cf3b79df773d6f33c7387bbe85b465ef7d517", size = 146787, upload-time = "2026-10-20T20:12:12.607Z" },
 ]
 
 [[package]]
