@@ -5,7 +5,7 @@ description = "Cash flow forecasting and customer segmentation agent"
 requires-python = ">=3.12"
 dependencies = [
     # Core data
-    "polars>=1.44.2",
+    "polars>=2.0.0",
     "numpy>=2.5.4",
     "pandas>=3.0.6",          # statsforecast requires pandas
 
