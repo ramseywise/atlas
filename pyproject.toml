@@ -19,7 +19,7 @@ dependencies = [
     "hdbscan>=0.8.44",
 
     # LangGraph / Anthropic
-    "langgraph>=1.2.17",
+    "langgraph>=1.2.18",
     "anthropic>=1.15.0",
 
     # Knowledge graph
@@ -49,16 +49,16 @@ tsfresh = [
     "tsfresh>=0.21.2",
 ]
 dev = [
-    "pytest>=9.1.1",
+    "pytest>=9.2.0",
     "pytest-asyncio>=1.4.1",
-    "ruff>=0.17.2",
+    "ruff>=0.17.3",
 ]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.1.1",
+    "pytest>=9.2.0",
     "pytest-asyncio>=1.4.1",
-    "ruff>=0.17.2",
+    "ruff>=0.17.3",
 ]
 
 [tool.pytest.ini_options]
