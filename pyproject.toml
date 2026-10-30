@@ -20,7 +20,7 @@ dependencies = [
 
     # LangGraph / Anthropic
     "langgraph>=1.2.17",
-    "anthropic>=1.15.0",
+    "anthropic>=2.3.0",
 
     # Knowledge graph
     "neo4j>=6.4.1",
