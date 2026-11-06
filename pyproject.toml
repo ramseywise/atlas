@@ -19,7 +19,7 @@ dependencies = [
     "hdbscan>=0.8.44",
 
     # LangGraph / Anthropic
-    "langgraph>=1.2.17",
+    "langgraph>=1.2.19",
     "anthropic>=1.15.0",
 
     # Knowledge graph
@@ -37,28 +37,28 @@ dependencies = [
     "httpx>=0.27.0",
 
     # Crypto
-    "ccxt>=4.5.90",
+    "ccxt>=4.5.91",
 ]
 
 [project.optional-dependencies]
 chronos = [
-    "torch>=2.14.1",
+    "torch>=2.15.0",
     "chronos-forecasting>=2.3.2",
 ]
 tsfresh = [
     "tsfresh>=0.21.2",
 ]
 dev = [
-    "pytest>=9.1.1",
+    "pytest>=9.2.0",
     "pytest-asyncio>=1.4.1",
-    "ruff>=0.17.2",
+    "ruff>=0.17.3",
 ]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.1.1",
+    "pytest>=9.2.0",
     "pytest-asyncio>=1.4.1",
-    "ruff>=0.17.2",
+    "ruff>=0.17.3",
 ]
 
 [tool.pytest.ini_options]
